@@ -1,7 +1,7 @@
 import './App.css'
 import { useState } from 'react';
-import { Header } from './components/header.jsx';
-import { Sidebar } from './components/sidebar.jsx';
+import { Header } from './components/Header.jsx';
+import { Sidebar } from './components/Sidebar.jsx';
 import { ContentPanel } from './components/ContentPanel';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
