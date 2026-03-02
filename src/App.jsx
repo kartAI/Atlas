@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Header } from "./components/header.jsx";
-import { Sidebar } from "./components/sidebar.jsx";
-import Map from "./components/map.jsx";
+import { Header } from "./components/Header.jsx";
+import { Sidebar } from "./components/Sidebar.jsx";
+import Map from "./components/Map.jsx";
 
 function App() {
   const [activeItem, setActiveItem] = useState("Kartlag");

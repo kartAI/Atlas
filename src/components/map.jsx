@@ -81,27 +81,39 @@ function Map() {
     }, [showGoogle, lat, lng]);
 
     return (
-        <div style={{ height: "100%", width: "100%", position: "relative" }}>
-            <div style={{ position: "absolute", top: showGoogle ? 10 : 85, right: 10, zIndex: 1000 }}>
-                <button
-                    onClick={() => setShowGoogle(!showGoogle)}
-                    style={{
-                        width: 110,
-                        height: 80,
-                        border: "1px solid #999",
-                        borderRadius: 8,
-                        backgroundImage: `url(${showGoogle ? roadThumb : satelliteThumb})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        cursor: "pointer",
-                        color: "white",
-                        fontWeight: "bold",
-                        textShadow: "0 1px 2px rgba(0,0,0,0.9)"
-                    }}
-                    title={showGoogle ? "Bytt til Leaflet" : "Bytt til Google 3D"}
-                >
-                    {showGoogle ? "Leaflet" : "Google 3D"}
-                </button>
+        <div className="map-root">
+            <div className="map-control-stack">
+                <div className="map-mode-card" aria-label="Kartmodus">
+                    <div className="map-mode-title">Kartmodus</div>
+                    <button
+                        type="button"
+                        className={`map-mode-item ${!showGoogle ? "is-active" : ""}`}
+                        onClick={() => setShowGoogle(false)}
+                        title="Bytt til Leaflet"
+                        aria-pressed={!showGoogle}
+                    >
+                        <span className="map-mode-bullet" />
+                        <span className="map-mode-text">
+                            <span className="map-mode-label">Leaflet</span>
+                            <span className="map-mode-sub">2D kart</span>
+                        </span>
+                        <span className="map-mode-thumb" style={{ backgroundImage: `url(${roadThumb})` }} />
+                    </button>
+                    <button
+                        type="button"
+                        className={`map-mode-item ${showGoogle ? "is-active" : ""}`}
+                        onClick={() => setShowGoogle(true)}
+                        title="Bytt til Google 3D"
+                        aria-pressed={showGoogle}
+                    >
+                        <span className="map-mode-bullet" />
+                        <span className="map-mode-text">
+                            <span className="map-mode-label">Google 3D</span>
+                            <span className="map-mode-sub">3D visning</span>
+                        </span>
+                        <span className="map-mode-thumb" style={{ backgroundImage: `url(${satelliteThumb})` }} />
+                    </button>
+                </div>
             </div>
 
             {!showGoogle && (
