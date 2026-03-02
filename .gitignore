@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+config.py
 
 # Python cache and virtual environment
 __pycache__/

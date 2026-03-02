@@ -1,1 +1,5 @@
-# Add your API or other keys
+# HOST=0.0.0.0
+# PORT=8000
+# ALLOWED_ORIGINS=http://localhost:3000
+# MODEL_NAME=Your-model-name-here
+# SESSION_TIMEOUT_MINUTES=15

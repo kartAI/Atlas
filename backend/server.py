@@ -1,4 +1,5 @@
 import asyncio
+from backend.config import ALLOWED_ORIGINS
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,15 +9,15 @@ from session_manager import SessionManager
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], # Can also add whatever the frontend is running on? That's what should go here, right?
+    allow_origins=ALLOWED_ORIGINS, # Frontend port.
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 client = CopilotClient()
-manager = SessionManager(client) # Creates a manager that lives for the entire server lifetime - this can be skipped on actual deployment if necessary. Just don't know how yet.
+manager = SessionManager(client) # Creates a manager that lives for the entire server lifetime.
 class ChatRequest(BaseModel):
-    message: str # this could also be called prompt?
+    message: str # Prompt.
     session_id: str | None = None 
     # session_id is optional and can be None if not provided.
     # This allows the get_or_create method in SessionManager to handle both cases where session_id is given and where it is not.
@@ -24,11 +25,10 @@ class ChatRequest(BaseModel):
     
 @app.on_event("startup")
 async def startup_event(): 
-    await client.start() # a bit unsure if it should be client.connect
-    
+    await client.start() 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await client.stop() # a bit unsure if it should be client.disconnect - think both work
+    await client.stop() 
     
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
