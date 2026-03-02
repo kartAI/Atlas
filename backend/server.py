@@ -16,27 +16,27 @@ app.add_middleware(
 client = CopilotClient()
 manager = SessionManager(client) # Creates a manager that lives for the entire server lifetime - this can be skipped on actual deployment if necessary. Just don't know how yet.
 class ChatRequest(BaseModel):
-    message: str # denne kan også være prompt?
+    message: str # this could also be called prompt?
     session_id: str | None = None 
-    # session_id er valgfri, og kan være None hvis det ikke er gitt. 
-    # Dette gjør at get_or_create metoden i SessionManager kan håndtere både tilfeller der session_id er gitt og der det ikke er gitt.
-    # Hvis session_id er None, vil get_or_create opprette en ny session. Hvis session_id er gitt, vil get_or_create prøve å hente den eksisterende sessionen.
+    # session_id is optional and can be None if not provided.
+    # This allows the get_or_create method in SessionManager to handle both cases where session_id is given and where it is not.
+    # If session_id is None, get_or_create will create a new session. If session_id is given, get_or_create will try to retrieve the existing session.
     
 @app.on_event("startup")
 async def startup_event(): 
-    await client.start() # litt usikker på om det skal være client.connect
+    await client.start() # a bit unsure if it should be client.connect
     
 @app.on_event("shutdown")
 async def shutdown_event():
-    await client.stop() # litt usikker på om det skal være client.disconnect - tror begge funker
+    await client.stop() # a bit unsure if it should be client.disconnect - think both work
     
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     session_id, session = await manager.get_or_create(request.session_id) 
     reply = await manager.send_message(session_id, request.message)
-    return {"reply": reply, "session_id": session_id} # Bruker nå manager.get_or_create og manager.send_message i stedet for å oprette session hver gang.
+    return {"reply": reply, "session_id": session_id} # Now uses manager.get_or_create and manager.send_message instead of creating a session every time.
 
 @app.get("/api/history/{session_id}")
 async def get_history(session_id: str):
     history = manager.get_history(session_id)
-    return {"history": history}    # Nytt endepunkt for frontend kan hente hele samtalehistorikken for en gitt session_id.
+    return {"history": history}    # New endpoint so the frontend can fetch the full conversation history for a given session_id.
