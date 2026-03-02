@@ -42,7 +42,9 @@
 }
 
 .sidebar-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 12px 20px;
   border: none;
@@ -65,6 +67,43 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
+  position: relative;
+}
+
+.content-panel {
+  width: 340px;
+  min-width: 340px;
+  border-left: 1px solid #d1d5db;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.content-panel h2 {
+  margin: 56px 16px 16px;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
 }
 
 .map-root {

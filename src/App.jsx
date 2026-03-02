@@ -1,19 +1,25 @@
 import { useState } from "react";
-import { Header } from "./components/Header.jsx";
-import { Sidebar } from "./components/Sidebar.jsx";
-import Map from "./components/Map.jsx";
+import { Header } from "./components/header.jsx";
+import { Sidebar } from "./components/sidebar.jsx";
+import { ContentPanel } from "./components/ContentPanel.jsx";
+import Map from "./components/map.jsx";
 
 function App() {
-  const [activeItem, setActiveItem] = useState("Kartlag");
+  const [activePanel, setActivePanel] = useState(null);
+
+  function handleSelect(item) {
+    setActivePanel((current) => (current === item ? null : item));
+  }
 
   return (
     <div className="app">
       <Header />
       <div className="app-body">
-        <Sidebar activeItem={activeItem} onSelect={setActiveItem} />
+        <Sidebar activeItem={activePanel} onSelect={handleSelect} />
         <div className="content">
           <Map />
         </div>
+        <ContentPanel activePanel={activePanel} onClose={() => setActivePanel(null)} />
       </div>
     </div>
   );
