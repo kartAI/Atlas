@@ -1,4 +1,4 @@
-import { ChatInterface } from './_ChatInterface';
+import { ChatInterface } from './ChatInterface';
 
 const PANEL_COMPONENTS = {
     'Chatbot': ChatInterface,
