@@ -1,8 +1,8 @@
 import './App.css'
 import { useState } from 'react';
-import { Header } from './components/Header.jsx';
-import { Sidebar } from './components/Sidebar.jsx';
-import { ContentPanel } from './components/ContentPanel';
+import { Header } from './components/_Header.jsx';
+import { Sidebar } from './components/_Sidebar.jsx';
+import { ContentPanel } from './components/_ContentPanel';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSquarePollVertical } from '@fortawesome/free-solid-svg-icons';
