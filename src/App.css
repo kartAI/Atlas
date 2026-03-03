@@ -7,6 +7,12 @@
   height: calc(100vh - 75px);
 }
 
+.map-stage {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
 .sidebar {
   width: 275px;
   min-width: 275px;
@@ -169,4 +175,10 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.map-root {
+  height: 100%;
+  width: 100%;
+  position: relative;
 }

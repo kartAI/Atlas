@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Header } from './components/Header.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ContentPanel } from './components/ContentPanel.jsx';
+import Map from './components/Map.jsx';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSquarePollVertical } from '@fortawesome/free-solid-svg-icons';
@@ -35,6 +36,9 @@ function App() {
           activePanel={activePanel} 
           onClose={() => setActivePanel(null)}
         />
+        <main className="map-stage">
+          <Map />
+        </main>
       </div>
     </>
   )
