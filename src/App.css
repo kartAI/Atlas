@@ -1,3 +1,11 @@
+:root {
+  --darkmode: #202020;
+  --lightmode: #ffffff;
+  --primarycolor: #26BE76;
+  --secondarycolor: #1E9D63;
+  --hoverdark: #1d1d1d;
+}
+
 .app {
   /* App styles here */
 }
@@ -17,7 +25,7 @@
 .sidebar {
   width: 240px;
   min-width: 240px;
-  background: #202020;
+  background: var(--darkmode);
   color: #ffffff;
   height: 100%;
   display: flex;
@@ -124,8 +132,8 @@
 
 .sidebar-item.active {
   background: rgba(38, 190, 118, 0.12);
-  color: #26BE76;
-  box-shadow: inset 3px 0 0 #26BE76;
+  color: var(--primarycolor);
+  box-shadow: inset 3px 0 0 var(--primarycolor);
 }
 
 .sidebar--collapsed .sidebar-item.active {
@@ -150,7 +158,7 @@
 .content-panel {
   width: 40vw;
   height: 100%;
-  background: #1f1f1f;
+  background: var(--darkmode);
   border-left: 1px solid #e0e0e0;
   padding: 20px;
   overflow-y: auto;
@@ -176,7 +184,7 @@
 }
 
 .header-bar {
-  background:#202020;
+  background:var(--darkmode);
   height: 75px;
   padding-top: 10px;
 }
@@ -185,7 +193,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f1f5f9;
+  background: var(--darkmode);
 }
 
 .chat-messages {
@@ -214,7 +222,7 @@
 }
 
 .chat-bubble--user {
-  background: #26BE76;
+  background: var(--primarycolor);
   color: #fff;
   align-self: flex-end;
   border-bottom-right-radius: 4px;
@@ -225,8 +233,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  background: #343030;
+  border-radius: 12px;
 }
 
 .chat-input-area textarea {
@@ -243,14 +251,14 @@
 }
 
 .chat-input-area textarea:focus {
-  border-color: #26BE76;
+  border-color: var(--primarycolor);
 }
 
 .chat-input-area button {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #26BE76;
+  background: var(--primarycolor);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -258,14 +266,17 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+.chat-input-area button:hover {
+  background: var(--secondarycolor);
 }
 
 .Paperclip button {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #4a4d4c;
-  color: #fff;
+  background: #232222;
+  color: #ffffff;
   border: none;
   cursor: pointer;
   display: flex;
@@ -274,69 +285,9 @@
   flex-shrink: 0;
 }
 
-.attachment-preview-strip {
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: #fff;
-  border-top: 1px solid #e5e7eb;
-  overflow-x: auto;
+.Paperclip button:hover {
+  background: var(--hoverdark);
 }
-
-.attachment-card {
-  position: relative;
-  width: 90px;
-  min-width: 90px;
-  padding: 0.4rem;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.attachment-remove {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 20px !important;
-  height: 20px !important;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.55) !important;
-  color: #fff;
-  cursor: pointer;
-}
-
-.attachment-thumb {
-  width: 100%;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 6px;
-}
-
-.attachment-file-icon {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4a4d4c;
-}
-
-.attachment-name {
-  font-size: 0.7rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 80px;
-  display: block;
-}
-
-.attachment-size {
-  font-size: 0.6rem;
-  color: #888;
-}
-
 .map-root {
   height: 100%;
   width: 100%;
