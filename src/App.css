@@ -13,6 +13,7 @@
   height: 100%;
 }
 
+/* Sidebar */
 .sidebar {
   width: 275px;
   min-width: 275px;
@@ -52,15 +53,21 @@
   background: #3a3a3a;
 }
 
+.sidebar-item:hover .sidebar-icon {
+  transform: scale(1.10);
+}
+
 .sidebar-item.active {
-  background: #26BE76;
+  background: rgba(38, 190, 118, 0.15);
+  color: #26BE76
 }
 
 .sidebar-icon {
   width: 20px;
   text-align: center;
-}
+} 
 
+/* Content Panel */
 .content-panel {
   width: 40vw;
   height: 100%;
