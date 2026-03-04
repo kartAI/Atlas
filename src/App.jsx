@@ -5,21 +5,21 @@ import { Sidebar } from './components/Sidebar.jsx';
 import { ContentPanel } from './components/ContentPanel.jsx';
 import Map from './components/Map.jsx';
 
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSquarePollVertical } from '@fortawesome/free-solid-svg-icons';
+import { faLayerGroup, faChartLine, faFileExport } from '@fortawesome/free-solid-svg-icons';
 import { faMessage } from '@fortawesome/free-regular-svg-icons';
 import { layer } from '@fortawesome/fontawesome-svg-core';
 import { map } from 'leaflet';
 
 const menuItems = [
     { id: 'Chatbot', label: 'Chatbot', icon: faMessage },
-    { id: 'Kartlag', label: 'Kartlag', icon: faSquarePollVertical },
-    { id: 'Analyse', label: 'Analyse', icon: faSquarePollVertical },
-    { id: 'Eksporter', label: 'Eksporter', icon: faSquarePollVertical },
+    { id: 'Kartlag', label: 'Kartlag', icon: faLayerGroup },
+    { id: 'Analyse', label: 'Analyse', icon: faChartLine },
+    { id: 'Eksporter', label: 'Eksporter', icon: faFileExport },
 ];
 
 function App() {
   const [activePanel, setActivePanel] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [layers, setLayers] = useState([{
     id: 'osm',
@@ -65,6 +65,8 @@ function App() {
           items={menuItems} 
           activePanel={activePanel} 
           onSelect={handleSelect}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(c => !c)}
         />
         <ContentPanel 
           activePanel={activePanel} 
