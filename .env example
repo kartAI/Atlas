@@ -3,3 +3,5 @@
 # ALLOWED_ORIGINS=http://localhost:3000
 # MODEL_NAME=Your-model-name-here
 # SESSION_TIMEOUT_MINUTES=15
+# AZURE_CONNECTION_STRING=Your-Azure-Blob-Storage-connection-string-here
+# DATABASE_URL=postgresql://brukernavn:passord@host:port/databasenavn
