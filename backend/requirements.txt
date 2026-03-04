@@ -4,4 +4,5 @@ python-dotenv
 github-copilot-sdk
 azure-storage-blob
 pymupdf
-asyncpg
+psycopg[binary]
+psycopg-pool

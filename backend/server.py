@@ -73,6 +73,5 @@ async def get_history(session_id: str):
 @app.get("/api/test-db")
 async def test_db():
     result = await query("SELECT * FROM kulturmiljoer.kommunenummer LIMIT 5")
-    rows = [dict(row) for row in result]
-    return {"data": rows} # New endpoint to test database connectivity and query execution.
+    return {"data": result} # Endpoint to test database connection and query execution.
 # TESTING END

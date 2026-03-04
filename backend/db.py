@@ -1,17 +1,18 @@
-import asyncpg
+import psycopg
+from psycopg_pool import AsyncConnectionPool
 import ssl
+from psycopg.rows import dict_row
 from config import DATABASE_URL
 
 pool = None
 
 # Creates a function to connect to the pgSQL database.
-# SSL context is created for secure connection to the database.
+# SSL context is handled by psycopg when using "?ssl=require".
 async def connect_db():
     global pool
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-    pool = await asyncpg.create_pool(DATABASE_URL, ssl=ssl_context)
+    conninfo = f"{DATABASE_URL}?sslmode=require"
+    pool = AsyncConnectionPool(conninfo, kwargs={"row_factory": dict_row,}, open=False)
+    await pool.open()
 
 # Creates a function to disconnect from the pgSQL database.
 async def disconnect_db():
@@ -19,7 +20,11 @@ async def disconnect_db():
     if pool:
         await pool.close()
 
-# Creates a function to execute a query against the database. Asyncpg method prevent SQL Injection.
-async def query(sql, *params):
-    async with pool.acquire() as connection:
-        return await connection.fetch(sql, *params)
+
+# Creates a function to execute a query against the database. Psycopg method prevent SQL Injection.
+# Params optional. If provided, psycopg will safely inject them into the query.
+async def query(sql, params=None):
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(sql, params)
+            return await cur.fetchall()
