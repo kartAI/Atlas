@@ -32,14 +32,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Document is optional. Frontend can include name of document to fetch in the prompt.
+# Session_id is optional and can be None if not provided.
+# This allows the get_or_create method in SessionManager to handle both cases where session_id is given and where it is not.
+# If session_id is None, get_or_create will create a new session. If session_id is given, get_or_create will try to retrieve the existing session.
 class ChatRequest(BaseModel):
     message: str # Prompt.
     session_id: str | None = None 
     document: str | None = None
-    # Document is optional. Frontend can include name of document to fetch in the prompt.
-    # Session_id is optional and can be None if not provided.
-    # This allows the get_or_create method in SessionManager to handle both cases where session_id is given and where it is not.
-    # If session_id is None, get_or_create will create a new session. If session_id is given, get_or_create will try to retrieve the existing session.
+
     
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
@@ -70,11 +72,7 @@ async def get_history(session_id: str):
 # TESTING DATABASE CONNECTIVITY AND QUERY EXECUTION
 @app.get("/api/test-db")
 async def test_db():
-    result = await query("""
-        SELECT table_schema, table_name 
-        FROM information_schema.tables 
-        WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-    """)
+    result = await query("SELECT * FROM kulturmiljoer.kommunenummer LIMIT 5")
     rows = [dict(row) for row in result]
     return {"data": rows} # New endpoint to test database connectivity and query execution.
 # TESTING END
