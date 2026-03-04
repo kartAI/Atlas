@@ -35,7 +35,7 @@ app.add_middleware(
 
 # Document is optional. Frontend can include name of document to fetch in the prompt.
 # Session_id is optional and can be None if not provided.
-# This allows the get_or_create method in SessionManager to handle both cases where session_id is given and where it is not.
+# This allows the get_or_create method in session_manager to handle both cases where session_id is given and where it is not.
 # If session_id is None, get_or_create will create a new session. If session_id is given, get_or_create will try to retrieve the existing session.
 class ChatRequest(BaseModel):
     message: str # Prompt.
