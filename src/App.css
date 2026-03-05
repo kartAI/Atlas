@@ -13,6 +13,7 @@
 .app-body {
   display: flex;
   height: calc(100vh - 75px);
+  background-color: var(--darkmode);
 }
 
 .map-stage {
@@ -156,20 +157,38 @@
 
 /* Content Panel */
 .content-panel {
-  width: 40vw;
+  width: 0;
+  max-width: 0;
   height: 100%;
   background: var(--darkmode);
-  border-left: 1px solid #e0e0e0;
-  padding: 20px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
   position: relative;
   color: #ffffff;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.content-panel--open {
+  width: 40vw;
+  max-width: 40vw;
+  padding: 20px;
+  opacity: 1;
+  overflow-y: auto;
+}
+
+.content-panel--closed {
+  pointer-events: none;
 }
 
 .close-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: -7px;
+  right: 21px;
   background: none;
   border: none;
   font-size: 1.2rem;
@@ -233,8 +252,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: #343030;
-  border-radius: 12px;
+  border-top: 0.1px solid #3d3d3d81;
+  background: var(--darkmode);
 }
 
 .chat-input-area textarea {
@@ -267,27 +286,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.chat-input-area button:hover {
-  background: var(--secondarycolor);
-}
 
-.Paperclip button {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #232222;
-  color: #ffffff;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.Paperclip button:hover {
-  background: var(--hoverdark);
-}
 .map-root {
   height: 100%;
   width: 100%;
