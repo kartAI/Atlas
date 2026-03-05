@@ -8,14 +8,13 @@ const PANEL_COMPONENTS = {
 };
 
 export function ContentPanel({ activePanel, onClose }) {
-    if (!activePanel) return null; // Don't render if no active panel
-
+    const isOpen = !!activePanel;
     const Component = PANEL_COMPONENTS[activePanel] || (() => <h2>{activePanel}</h2>);
 
     return (
-        <div className="content-panel">
+        <div className={`content-panel ${isOpen ? 'content-panel--open' : 'content-panel--closed'}`}>
             <button className="close-btn" onClick={onClose}>✕</button>
-            <Component />
+            {isOpen && <Component />}
         </div>
     );
 }
