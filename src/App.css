@@ -1,3 +1,11 @@
+:root {
+  --darkmode: #202020;
+  --lightmode: #ffffff;
+  --primarycolor: #26BE76;
+  --secondarycolor: #1E9D63;
+  --hoverdark: #1d1d1d;
+}
+
 .app {
   /* App styles here */
 }
@@ -17,7 +25,7 @@
 .sidebar {
   width: 240px;
   min-width: 240px;
-  background: #202020;
+  background: var(--darkmode);
   color: #ffffff;
   height: 100%;
   display: flex;
@@ -124,8 +132,8 @@
 
 .sidebar-item.active {
   background: rgba(38, 190, 118, 0.12);
-  color: #26BE76;
-  box-shadow: inset 3px 0 0 #26BE76;
+  color: var(--primarycolor);
+  box-shadow: inset 3px 0 0 var(--primarycolor);
 }
 
 .sidebar--collapsed .sidebar-item.active {
@@ -150,7 +158,7 @@
 .content-panel {
   width: 40vw;
   height: 100%;
-  background: #1f1f1f;
+  background: var(--darkmode);
   border-left: 1px solid #e0e0e0;
   padding: 20px;
   overflow-y: auto;
@@ -176,7 +184,7 @@
 }
 
 .header-bar {
-  background:#202020;
+  background:var(--darkmode);
   height: 75px;
   padding-top: 10px;
 }
@@ -214,7 +222,7 @@
 }
 
 .chat-bubble--user {
-  background: #26BE76;
+  background: var(--primarycolor);
   color: #fff;
   align-self: flex-end;
   border-bottom-right-radius: 4px;
@@ -243,14 +251,14 @@
 }
 
 .chat-input-area textarea:focus {
-  border-color: #26BE76;
+  border-color: var(--primarycolor);
 }
 
 .chat-input-area button {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #26BE76;
+  background: var(--primarycolor);
   color: #fff;
   border: none;
   cursor: pointer;
