@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import datetime, timedelta
 from copilot import CopilotClient
-from backend.config import MODEL_NAME, SYSTEM_PROMPT, SESSION_TIMEOUT_MINUTES
+from config import MODEL_NAME, SYSTEM_PROMPT, SESSION_TIMEOUT_MINUTES
 
 class SessionManager:
     def __init__(self, client: CopilotClient, timeout_minutes=SESSION_TIMEOUT_MINUTES):
