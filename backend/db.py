@@ -7,7 +7,7 @@ from config import DATABASE_URL
 pool = None
 
 # Creates a function to connect to the pgSQL database.
-# SSL context is handled by psycopg when using "?ssl=require".
+# SSL context is handled by psycopg when using "?sslmode=require".
 async def connect_db():
     global pool
     conninfo = f"{DATABASE_URL}?sslmode=require"
