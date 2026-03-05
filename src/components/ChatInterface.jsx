@@ -89,18 +89,18 @@ export function ChatInterface() {
     {attachments.map((att) => (
       <div key={att.id} className="attachment-card">
 
-        {/* X-knapp øverst i hjørnet */}
+        {/* X-button in the top corner */}
         <button className="attachment-remove" onClick={() => removeAttachment(att.id)}>
           <X size={14} />
         </button>
 
-        {/* Bilde-thumbnail ELLER fil-ikon */}
+        {/* Thumbnails/Icons for file preview */}
         {att.preview
           ? <img src={att.preview} alt={att.name} className="attachment-thumb" />
           : <div className="attachment-file-icon"><FileText size={28} /></div>
         }
 
-        {/* Filnavn og størrelse */}
+        {/* Filesize */}
         <div className="attachment-info">
           <span className="attachment-name">{att.name}</span>
           <span className="attachment-size">{(att.size / 1024).toFixed(1)} KB</span>
