@@ -8,15 +8,14 @@ const PANEL_COMPONENTS = {
     'Eksporter': () => <h2>Eksporter</h2> // Replace with real component later
 };
 
-export function ContentPanel({ activePanel, onClose, layers, onToggleLayer }) {
-    if (!activePanel) return null; // Don't render if no active panel
-
+export function ContentPanel({ activePanel, onClose }) {
+    const isOpen = !!activePanel;
     const Component = PANEL_COMPONENTS[activePanel] || (() => <h2>{activePanel}</h2>);
 
     return (
-        <div className="content-panel">
+        <div className={`content-panel ${isOpen ? 'content-panel--open' : 'content-panel--closed'}`}>
             <button className="close-btn" onClick={onClose}>✕</button>
-            <Component />
+            {isOpen && <Component />}
         </div>
     );
 }

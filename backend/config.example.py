@@ -1,5 +1,7 @@
 import os
 from dotenv import load_dotenv
+from azure.storage.blob import BlobServiceClient
+import fitz
 
 load_dotenv()
 
@@ -20,3 +22,10 @@ SESSION_TIMEOUT_MINUTES = int(os.getenv("SESSION_TIMEOUT_MINUTES", "15"))
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", """
 Your system prompt here.
 """.strip())
+
+# Azure Blob Storage configuration
+AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING")
+BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME")
+
+# POSTGRESQL DATABASE URL
+DATABASE_URL = os.getenv("DATABASE_URL")

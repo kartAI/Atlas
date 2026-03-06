@@ -4,6 +4,7 @@
   --primarycolor: #26BE76;
   --secondarycolor: #1E9D63;
   --hoverdark: #1d1d1d;
+  --separator-dark: #3d3d3d81;
 }
 
 .app {
@@ -13,6 +14,7 @@
 .app-body {
   display: flex;
   height: calc(100vh - 75px);
+  background-color: var(--darkmode);
 }
 
 .map-stage {
@@ -156,20 +158,38 @@
 
 /* Content Panel */
 .content-panel {
-  width: 40vw;
+  width: 0;
+  max-width: 0;
   height: 100%;
   background: var(--darkmode);
-  border-left: 1px solid #e0e0e0;
-  padding: 20px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
   position: relative;
   color: #ffffff;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.content-panel--open {
+  width: 40vw;
+  max-width: 40vw;
+  padding: 20px;
+  opacity: 1;
+  overflow-y: auto;
+}
+
+.content-panel--closed {
+  pointer-events: none;
 }
 
 .close-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: -7px;
+  right: 21px;
   background: none;
   border: none;
   font-size: 1.2rem;
@@ -193,7 +213,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f1f5f9;
+  background: var(--darkmode);
 }
 
 .chat-messages {
@@ -219,6 +239,7 @@
   font-size: 0.9rem;
   line-height: 1.4;
   word-break: break-word;
+  margin-bottom: 5px;
 }
 
 .chat-bubble--user {
@@ -233,8 +254,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  border-top: 0.1px solid var(--separator-dark);
+  background: var(--darkmode);
 }
 
 .chat-input-area textarea {
@@ -409,4 +430,162 @@
 .map-layers-radio.active .map-layers-radio-dot {
   background: var(--primarycolor);
   transform: scale(1);
+}
+
+/* Attachment Preview Strip (before sending) - Smaller */
+.attachment-preview-strip {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 0.1px solid var(--separator-dark);
+  overflow-x: auto;
+  background: var(--darkmode);
+}
+
+.attachment-preview-strip .attachment-card {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.attachment-preview-strip .attachment-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-preview-strip .attachment-file-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.attachment-preview-strip .attachment-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px;
+  font-size: 0.65rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.attachment-preview-strip .attachment-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.attachment-preview-strip .attachment-size {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.attachment-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.attachment-remove:hover {
+  background: rgba(255, 0, 0, 0.8);
+}
+
+/* Message Wrapper - contains text bubble + attachments */
+.message-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 80%;
+  margin-bottom: 5px;
+}
+
+.message-wrapper--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+/* Images as attachments */
+.message-image-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 100%;
+  margin-bottom: 5px;
+}
+
+.message-image-attachments .attachment-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.message-image-attachments .attachment-image img {
+  width: 100%;
+  height: auto;
+  max-width: 200px;
+  display: block;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+/* Files as small attachment cards */
+.message-file-attachments {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+}
+
+.message-file-attachments .attachment-card {
+  width: 130px;
+  height: 130px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  position: relative;
+}
+
+.message-file-attachments .attachment-file-icon {
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
+}
+
+.message-file-attachments .attachment-file-name {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
 }

@@ -1,12 +1,30 @@
+import os
+from contextlib import asynccontextmanager
 import asyncio
-from backend.config import ALLOWED_ORIGINS
+from dotenv import load_dotenv
+load_dotenv()
+
+from config import ALLOWED_ORIGINS
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from copilot import CopilotClient
 from session_manager import SessionManager
+from db import connect_db, disconnect_db, query
+from config import list_documents, fetch_document # Demo functionality
 
-app = FastAPI()
+client = CopilotClient()
+manager = SessionManager(client)
+
+@asynccontextmanager
+async def lifespan(app):
+     await client.start() # Starts the Copilot client when the server starts.
+     await connect_db() # Connects to the database when the server starts.
+     yield
+     await client.stop() # Stops the Copilot client when the server shuts down.
+     await disconnect_db() # Disconnects from the database when the server shuts down.   
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS, # Frontend port.
@@ -14,29 +32,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = CopilotClient()
-manager = SessionManager(client) # Creates a manager that lives for the entire server lifetime.
+
+# Document is optional. Frontend can include name of document to fetch in the prompt.
+# Session_id is optional and can be None if not provided.
+# This allows the get_or_create method in session_manager to handle both cases where session_id is given and where it is not.
+# If session_id is None, get_or_create will create a new session. If session_id is given, get_or_create will try to retrieve the existing session.
 class ChatRequest(BaseModel):
     message: str # Prompt.
     session_id: str | None = None 
-    # session_id is optional and can be None if not provided.
-    # This allows the get_or_create method in SessionManager to handle both cases where session_id is given and where it is not.
-    # If session_id is None, get_or_create will create a new session. If session_id is given, get_or_create will try to retrieve the existing session.
-    
-@app.on_event("startup")
-async def startup_event(): 
-    await client.start() 
-@app.on_event("shutdown")
-async def shutdown_event():
-    await client.stop() 
+    document: str | None = None
+
     
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     session_id, session = await manager.get_or_create(request.session_id) 
-    reply = await manager.send_message(session_id, request.message)
-    return {"reply": reply, "session_id": session_id} # Now uses manager.get_or_create and manager.send_message instead of creating a session every time.
+    
+    # DEMO FUNCTIONALITY TO FETCH DOCUMENTS FROM AZURE BLOB STORAGE
+    prompt = request.message
+    if request.document:
+        doc_text = fetch_document(request.document)
+        prompt = f"Dokument: {request.document}\n\n{doc_text}\n\nSpørsmål: {request.message}" 
+    # DEMO END
+
+    reply = await manager.send_message(session_id, prompt)
+    return {"reply": reply, "session_id": session_id}# Now uses manager.get_or_create and manager.send_message instead of creating a session every time.
+
+# DEMO FUNCTIONALITY TO LIST DOCUMENTS IN AZURE BLOB STORAGE.
+@app.get("/api/documents")
+async def get_documents():
+    docs = list_documents()
+    return {"documents": docs} # New endpoint to list available documents in Azure Blob Storage.
+# DEMO END.
 
 @app.get("/api/history/{session_id}")
 async def get_history(session_id: str):
     history = manager.get_history(session_id)
     return {"history": history}    # New endpoint so the frontend can fetch the full conversation history for a given session_id.
+
+# TESTING DATABASE CONNECTIVITY AND QUERY EXECUTION
+@app.get("/api/test-db")
+async def test_db():
+    result = await query("SELECT * FROM kulturmiljoer.kommunenummer LIMIT 5")
+    return {"data": result} # Endpoint to test database connection and query execution.
+# TESTING END
