@@ -3,7 +3,7 @@ import { MapLayers } from './MapLayers';
 
 const PANEL_COMPONENTS = {
     'Chatbot': ChatInterface,
-    'Kartlag': MapLayers, // Replace with real component later
+    'Kartlag': () => <h2>Kartlag</h2>, // Replace with real component later
     'Analyse': () => <h2>Analyse</h2>, // Replace with real component later
     'Eksporter': () => <h2>Eksporter</h2> // Replace with real component later
 };
@@ -16,7 +16,7 @@ export function ContentPanel({ activePanel, onClose, layers, onToggleLayer }) {
     return (
         <div className="content-panel">
             <button className="close-btn" onClick={onClose}>✕</button>
-            <Component layers={layers} onToggleLayer={onToggleLayer} />
+            <Component />
         </div>
     );
 }

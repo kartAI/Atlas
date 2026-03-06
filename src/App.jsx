@@ -45,13 +45,11 @@ function App() {
   ]);
 
   const toggleLayer = (layerId) => {
-    setLayers(layers.map(layer => {
-      if (layer.id === layerId) {
-        return { ...layer, visible: !layer.visible };
-      }
-      return layer;
-    }));
-    }
+    setLayers(layers.map(layer => ({
+      ...layer,
+      visible: layer.id === layerId,
+    })));
+  }
 
   const handleSelect = (id) => {
     setActivePanel(activePanel === id ? null : id);
@@ -75,7 +73,7 @@ function App() {
           onToggleLayer={toggleLayer} />
 
         <main className="map-stage">
-          <Map layers={layers} />
+          <Map layers={layers} onToggleLayer={toggleLayer} />
         </main>
       </div>
     </>
