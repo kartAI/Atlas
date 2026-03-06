@@ -68,28 +68,33 @@ export function ChatInterface() {
             
             return (
               <div key={i} className={`message-wrapper message-wrapper--${msg.role}`}>
-                {/* Images - use compact preview if there's text or multiple images */}
-                {images.length > 0 && (
-                  <div className={`message-image-attachments ${hasText || images.length > 1 ? 'message-image-attachments--preview' : ''}`}>
-                    {images.map((att) => (
-                      <div key={att.id} className="attachment-image">
-                        <img src={att.preview} alt={att.name} />
+                {/* Wrapper for all attachments to sit on same line */}
+                {(images.length > 0 || files.length > 0) && (
+                  <div className="message-attachments-wrapper">
+                    {/* Images - use compact preview if there's text or multiple images */}
+                    {images.length > 0 && (
+                      <div className={`message-image-attachments ${hasText || images.length > 1 ? 'message-image-attachments--preview' : ''}`}>
+                        {images.map((att) => (
+                          <div key={att.id} className="attachment-image">
+                            <img src={att.preview} alt={att.name} />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Files - use compact preview if there's text or multiple files */}
-                {files.length > 0 && (
-                  <div className={`message-file-attachments ${hasText || files.length > 1 ? 'message-file-attachments--preview' : ''}`}>
-                    {files.map((att) => (
-                      <div key={att.id} className="attachment-card">
-                        <div className="attachment-file-icon">
-                          <FileText size={hasText || files.length > 1 ? 20 : 28} />
-                        </div>
-                        <span className="attachment-file-name">{att.name}</span>
+                    )}
+                    
+                    {/* Files - use compact preview if there's text or multiple files */}
+                    {files.length > 0 && (
+                      <div className={`message-file-attachments ${hasText || files.length > 1 ? 'message-file-attachments--preview' : ''}`}>
+                        {files.map((att) => (
+                          <div key={att.id} className="attachment-card">
+                            <div className="attachment-file-icon">
+                              <FileText size={hasText || files.length > 1 ? 20 : 28} />
+                            </div>
+                            <span className="attachment-file-name">{att.name}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
 

@@ -535,6 +535,23 @@
   align-items: flex-end;
 }
 
+/* Wrapper to place images and files on same line */
+.message-attachments-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.message-attachments-wrapper .message-image-attachments {
+  margin-bottom: 0;
+}
+
+.message-attachments-wrapper .message-file-attachments {
+  padding: 0;
+}
+
 /* Images as attachments */
 .message-image-attachments {
   display: flex;
