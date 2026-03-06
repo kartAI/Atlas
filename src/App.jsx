@@ -39,10 +39,10 @@ function App() {
     type: 'tile',
     url: 'https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png',
     visible: false,
-  }, 
+  },
   {
-    id: 'satellite',
-    name: 'Satellite',
+    id: 'sjo',
+    name: 'Sjøkart',
     type: 'tile',
     url: 'https://cache.kartverket.no/v1/wmts/1.0.0/sjokartraster/default/webmercator/{z}/{y}/{x}.png',
     visible: false,
