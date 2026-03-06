@@ -7,7 +7,8 @@ export function MapLayers({ layers = [], onToggleLayer }) {
             <li key={layer.id}>
                 <label>
                     <input
-                        type="checkbox"
+                        type="radio"
+                        name="map-layer"
                         checked={layer.visible}
                         onChange={() => onToggleLayer(layer.id)}
                     />

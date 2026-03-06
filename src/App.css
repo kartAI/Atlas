@@ -333,7 +333,7 @@
 }
 
 .map-layers-toggle.active {
-  background: rgba(38, 190, 118, 0.15);
+  background: rgba(20, 20, 20, 0.8);
   color: var(--primarycolor);
   border-color: rgba(38, 190, 118, 0.25);
 }
