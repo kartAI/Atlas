@@ -1,5 +1,4 @@
 import { ChatInterface } from './ChatInterface';
-import { MapLayers } from './MapLayers';
 
 const PANEL_COMPONENTS = {
     'Chatbot': ChatInterface,

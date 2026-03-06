@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, Marker, Popup, useMap }
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLayerGroup } from '@fortawesome/free-solid-svg-icons';
 
-function FixMapSize() {
+/* function FixMapSize() {
     const map = useMap();
 
     useEffect(() => {
@@ -15,7 +15,7 @@ function FixMapSize() {
     }, [map]);
 
     return null;
-}
+}*/
 
 function Map({ layers, onToggleLayer }) {
     const center = [58.1467, 7.9956];
@@ -26,7 +26,6 @@ function Map({ layers, onToggleLayer }) {
     return (
         <div className="map-root">
             <MapContainer
-                key={layers.find(l => l.visible)?.id || 'default'}
                 center={center}
                 zoom={13}
                 minZoom={5}
@@ -69,12 +68,12 @@ function Map({ layers, onToggleLayer }) {
                         <ul className="map-layers-list">
                             {layers.map(layer => (
                                 <li key={layer.id} className="map-layers-item">
-                                    <label className="map-layers-label">
+                                    <label
+                                        className="map-layers-label"
+                                        onClick={() => onToggleLayer(layer.id)}
+                                    >
                                         <span className="map-layers-name">{layer.name}</span>
-                                        <div
-                                            className={`map-layers-radio ${layer.visible ? 'active' : ''}`}
-                                            onClick={(e) => { e.preventDefault(); onToggleLayer(layer.id); }}
-                                        >
+                                        <div className={`map-layers-radio ${layer.visible ? 'active' : ''}`}>
                                             <div className="map-layers-radio-dot" />
                                         </div>
                                     </label>

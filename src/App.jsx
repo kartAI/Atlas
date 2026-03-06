@@ -7,8 +7,6 @@ import Map from './components/Map.jsx';
 
 import { faLayerGroup, faChartLine, faFileExport } from '@fortawesome/free-solid-svg-icons';
 import { faMessage } from '@fortawesome/free-regular-svg-icons';
-import { layer } from '@fortawesome/fontawesome-svg-core';
-import { map } from 'leaflet';
 
 const menuItems = [
     { id: 'Chatbot', label: 'Chatbot', icon: faMessage },
