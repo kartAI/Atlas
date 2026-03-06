@@ -19,6 +19,36 @@ function App() {
   const [activePanel, setActivePanel] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const [layers, setLayers] = useState([{
+    id: 'osm',
+    name: 'OpenStreetMap',
+    type: 'tile',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    visible: true,
+  },
+  {    
+    id: 'topo',
+    name: 'Topografisk',
+    type: 'tile',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    visible: false,
+  }, 
+  {
+    id: 'satellite',
+    name: 'Satellite',
+    type: 'tile',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    visible: false,
+  }
+  ]);
+
+  const toggleLayer = (layerId) => {
+    setLayers(layers.map(layer => ({
+      ...layer,
+      visible: layer.id === layerId,
+    })));
+  }
+
   const handleSelect = (id) => {
     setActivePanel(activePanel === id ? null : id);
   };
@@ -37,9 +67,11 @@ function App() {
         <ContentPanel 
           activePanel={activePanel} 
           onClose={() => setActivePanel(null)}
-        />
+          layers={layers}
+          onToggleLayer={toggleLayer} />
+
         <main className="map-stage">
-          <Map />
+          <Map layers={layers} onToggleLayer={toggleLayer} />
         </main>
       </div>
     </>
