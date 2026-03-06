@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta
-from copilot import CopilotClient
+from copilot import CopilotClient, PermissionHandler
 from config import MODEL_NAME, SYSTEM_PROMPT, SESSION_TIMEOUT_MINUTES
 
 class SessionManager:
@@ -25,7 +25,10 @@ class SessionManager:
         # Used to retrieve an existing session if it exists.
         
         session_id = str(uuid.uuid4())
-        session = await self.client.create_session({"model": MODEL_NAME, "system_prompt": SYSTEM_PROMPT})
+        session = await self.client.create_session({
+            "model": MODEL_NAME,
+            "system_prompt": SYSTEM_PROMPT,
+            "on_permission_request": PermissionHandler.approve_all,})
         self.sessions[session_id] = session
         self.last_active[session_id] = datetime.now()
         self.history[session_id] = [] # Initializes an empty history for the new session.

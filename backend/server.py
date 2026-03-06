@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 import asyncio
 from dotenv import load_dotenv
+from urllib3 import request
 load_dotenv()
 
 from config import ALLOWED_ORIGINS
@@ -28,6 +29,7 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS, # Frontend port.
+    allow_credentials=True, # Allows cookies to be sent in cross-origin requests, which is necessary for seesion managment.
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -45,17 +47,70 @@ class ChatRequest(BaseModel):
     
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
+    
     session_id, session = await manager.get_or_create(request.session_id) 
     
+    print("DOCUMENT REQUESTED:", request.document) # Print the requested document name for debugging
+    
     # DEMO FUNCTIONALITY TO FETCH DOCUMENTS FROM AZURE BLOB STORAGE
+    docs = list_documents()
+    print("ALL DOCUMENTS:", docs)
+
+    # If the user is asking about available documents, list them clearly. Demo.
+    if "dokument" in request.message.lower() and (
+        "hvilke" in request.message.lower()
+        or "liste" in request.message.lower()
+        or "tilgang" in request.message.lower()
+    ):
+        prompt = f"""
+Du har tilgang til følgende dokumenter i Azure Blob Storage:
+
+{docs}
+
+Presenter listen tydelig for brukeren.
+"""
+        reply = await manager.send_message(session_id, prompt)
+        return {"reply": reply, "session_id": session_id}
+
+
+    # FIND RELEVANT DOCUMENTS BASED ON KEYWORDS
+    relevant_docs = docs
+    
+    print("RELEVANT DOCUMENTS:", relevant_docs)
     prompt = request.message
-    if request.document:
-        doc_text = fetch_document(request.document)
-        prompt = f"Dokument: {request.document}\n\n{doc_text}\n\nSpørsmål: {request.message}" 
+
+    # IF A SPECIFIC DOCUMENT IS REQUESTED, PRIORITIZE THAT ONE
+    if request.document and "dokument" not in request.message.lower():
+        relevant_docs = [request.document]
+        
+    # GET TEXT FROM THE MOST RELEVANT DOCUMENTS AND INCLUDE IN THE PROMPT
+    if relevant_docs:
+        combined_text = ""
+        for doc in relevant_docs: # Splice to only include a set number of documents.
+            print("USING DOCUMENT:", doc)
+            doc_text = fetch_document(doc)
+            combined_text += f"""
+Dokumentnavn: {doc}
+{doc_text}
+-------------------------
+"""
+
+    prompt = f"""
+Du har tilgang til følgende dokumenter fra Azure Blob Storage.
+
+{combined_text}
+
+Svar på brukerens spørsmål basert på informasjonen i dokumentene.
+
+Spørsmål: {request.message}
+"""
     # DEMO END
 
     reply = await manager.send_message(session_id, prompt)
-    return {"reply": reply, "session_id": session_id}# Now uses manager.get_or_create and manager.send_message instead of creating a session every time.
+    return {
+        "reply": reply,
+        "session_id": session_id
+    } # Now uses manager.get_or_create and manager.send_message instead of creating a session every time.
 
 # DEMO FUNCTIONALITY TO LIST DOCUMENTS IN AZURE BLOB STORAGE.
 @app.get("/api/documents")
