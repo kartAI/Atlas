@@ -535,13 +535,38 @@
   align-items: flex-end;
 }
 
+/* Wrapper to place images and files on same line */
+.message-attachments-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.message-attachments-wrapper .message-image-attachments {
+  margin-bottom: 0;
+}
+
+.message-attachments-wrapper .message-file-attachments {
+  padding: 0;
+}
+
 /* Images as attachments */
 .message-image-attachments {
   display: flex;
   flex-direction: column;
   gap: 6px;
   max-width: 100%;
-  margin-bottom: 5px;
+  margin-bottom: 0;
+  margin-right: 5px;
+}
+
+/* When multiple images OR when there's text: horizontal preview */
+.message-image-attachments--preview {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .message-image-attachments .attachment-image {
@@ -553,29 +578,49 @@
 }
 
 .message-image-attachments .attachment-image img {
-  width: 100%;
   height: auto;
-  max-width: 200px;
+  width: 70px;
+  height: 100px;
   display: block;
   object-fit: contain;
   border-radius: 12px;
 }
 
+.message-image-attachments--preview .attachment-image {
+  width: 70px;
+  height: 100px;
+}
+
+/* Smaller previews when in preview mode */
+.message-image-attachments--preview .attachment-image img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
 /* Files as small attachment cards */
 .message-file-attachments {
   display: flex;
+  flex-direction: row;
   gap: 8px;
   flex-wrap: wrap;
-  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 12px;
+  padding: 8px;
+}
+
+/* Smaller file previews when there's text or multiple files */
+.message-file-attachments--preview {
+  gap: 6px;
+  padding: 6px;
 }
 
 .message-file-attachments .attachment-card {
-  width: 130px;
-  height: 130px;
+  width: 100px;
+  height: 100px;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--file-attachments);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -584,17 +629,32 @@
   position: relative;
 }
 
+/* Smaller cards in preview mode */
+.message-file-attachments--preview .attachment-card {
+  width: 100px;
+  height: 100px;
+  padding: 6px;
+}
+
 .message-file-attachments .attachment-file-icon {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--primary-color);
   margin-bottom: 4px;
 }
 
+.message-file-attachments--preview .attachment-file-icon {
+  font-size: 0.9rem;
+}
+
 .message-file-attachments .attachment-file-name {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.9);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
+}
+
+.message-file-attachments--preview .attachment-file-name {
+  font-size: 0.7rem;
 }
