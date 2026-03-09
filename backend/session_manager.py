@@ -2,8 +2,13 @@ import asyncio
 import uuid
 from datetime import datetime, timedelta
 from copilot import CopilotClient, PermissionHandler
-from config import MODEL_NAME, SYSTEM_PROMPT, SESSION_TIMEOUT_MINUTES
+from config import DEMO_MODE, MODEL_NAME, SYSTEM_PROMPT, SESSION_TIMEOUT_MINUTES
 from tools import list_kommuner_tool, list_vernetyper_tool, buffer_search_tool # Demo functionality to list municipalities and protection types from the database. Can be used in the system prompt to make it available for the model to call.
+
+
+def strict_permission_handler(*_args, **_kwargs):
+    """Deny tool permission requests by default outside demo mode."""
+    return False
 
 class SessionManager:
     def __init__(self, client: CopilotClient, timeout_minutes=SESSION_TIMEOUT_MINUTES):
@@ -31,6 +36,12 @@ class SessionManager:
         # Store it in sessions and set last_active to the current time.
         # The session is created with the specified model, system prompt, and tools.
         session_id = str(uuid.uuid4())
+        # WARNING: approve_all must only be used for local/demo workflows.
+        permission_handler = (
+            PermissionHandler.approve_all
+            if DEMO_MODE
+            else getattr(PermissionHandler, "reject_all", strict_permission_handler)
+        )
         session = await self.client.create_session({
             "model": MODEL_NAME,
             "system_message": {
@@ -38,7 +49,7 @@ class SessionManager:
                 "content": SYSTEM_PROMPT
             },
             "tools": [list_kommuner_tool, list_vernetyper_tool, buffer_search_tool], # Adds the tools to the session, making them available for the model to call.
-            "on_permission_request": PermissionHandler.approve_all # For simplicity, we approve all permission requests. In a production system implement a handliung mechanism
+            "on_permission_request": permission_handler # In non-demo mode this denies by default; replace with allowlist/manual approval as needed.
         })
         self.sessions[session_id] = session
         self.last_active[session_id] = datetime.now()

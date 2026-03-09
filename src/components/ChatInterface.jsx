@@ -10,6 +10,7 @@ export function ChatInterface() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+
   function handleSend() {
     const trimmed = input.trim();
     if (!trimmed) return;

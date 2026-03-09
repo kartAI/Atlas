@@ -1,6 +1,14 @@
 from copilot import Tool
 from db import query
 import json
+import logging
+from config import (
+    BUFFER_DISTANCE_MAX_METERS,
+    BUFFER_DISTANCE_MIN_METERS,
+    BUFFER_RESULT_LIMIT,
+)
+
+logger = logging.getLogger(__name__)
 
 async def handle_list_kommuner(invocation):
     search = invocation["arguments"].get("search", "")
@@ -54,14 +62,39 @@ list_vernetyper_tool = Tool(
     handler=handle_list_vernetyper
 )
 
-import json
-
 async def handle_buffer_search(invocation):
-    lat = invocation["arguments"]["latitude"]
-    lon = invocation["arguments"]["longitude"]
-    distance = invocation["arguments"].get("distance", 1000)
+    arguments = invocation.get("arguments", {})
+    request_id = invocation.get("id", "unknown")
 
-    print(f"BUFFER SEARCH: lat={lat}, lon={lon}, distance={distance}")
+    try:
+        lat = float(arguments["latitude"])
+        lon = float(arguments["longitude"])
+        distance = float(arguments.get("distance", 1000))
+    except (KeyError, TypeError, ValueError):
+        logger.warning("buffer_search invalid arguments request_id=%s", request_id)
+        return {
+            "textResultForLlm": "Ugyldig input: latitude, longitude og distance må være numeriske verdier.",
+            "resultType": "error"
+        }
+
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        logger.warning("buffer_search out-of-range coordinates request_id=%s", request_id)
+        return {
+            "textResultForLlm": "Ugyldige koordinater: latitude må være mellom -90 og 90, longitude mellom -180 og 180.",
+            "resultType": "error"
+        }
+
+    if not (BUFFER_DISTANCE_MIN_METERS <= distance <= BUFFER_DISTANCE_MAX_METERS):
+        logger.warning("buffer_search out-of-range distance request_id=%s", request_id)
+        return {
+            "textResultForLlm": (
+                f"Ugyldig avstand: må være mellom {BUFFER_DISTANCE_MIN_METERS} "
+                f"og {BUFFER_DISTANCE_MAX_METERS} meter."
+            ),
+            "resultType": "error"
+        }
+
+    logger.debug("buffer_search started request_id=%s", request_id)
 
     try:
         result = await query("""
@@ -79,7 +112,8 @@ async def handle_buffer_search(invocation):
                 %s
             )
             ORDER BY avstand_meter ASC
-        """, (lon, lat, lon, lat, distance))
+            LIMIT %s
+        """, (lon, lat, lon, lat, distance, BUFFER_RESULT_LIMIT))
 
         features = []
         for row in result:
@@ -96,15 +130,19 @@ async def handle_buffer_search(invocation):
             "features": features
         }
 
-        print(f"BUFFER RESULT: {len(result)} rows")
+        logger.info("buffer_search success request_id=%s result_count=%s", request_id, len(result))
         return {
             "textResultForLlm": json.dumps(feature_collection, ensure_ascii=False),
             "resultType": "success"
         }
-    except Exception as e:
-        print(f"BUFFER ERROR: {e}")
+    except Exception as exc:
+        logger.exception(
+            "buffer_search failed request_id=%s error_type=%s",
+            request_id,
+            type(exc).__name__,
+        )
         return {
-            "textResultForLlm": f"Feil ved søk: {str(e)}",
+            "textResultForLlm": "Feil ved buffersøk. Proev igjen senere.",
             "resultType": "error"
         }
         
