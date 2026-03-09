@@ -3,21 +3,6 @@
     import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
     import { faLayerGroup } from '@fortawesome/free-solid-svg-icons';
 
-
-    /* function FixMapSize() {
-        const map = useMap();
-
-        useEffect(() => {
-            const i = setTimeout(() => {
-                map.invalidateSize();
-            }, 200);
-
-            return () => clearTimeout(i);
-        }, [map]);
-
-        return null;
-    }*/
-
     const NORWAY_BOUNDS = [
         [57.0, 3.0],   // southwest corner 
         [72.0, 32.0]   // northeast corner
