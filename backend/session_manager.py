@@ -25,13 +25,10 @@ class SessionManager:
     # First checks if session_id is provided and exists in one of the session_id dicts. 
     # Used to retrieve an existing session if it exists.
     async def get_or_create(self, session_id=None):
-        
         if session_id and session_id in self.sessions:
             self.last_active[session_id] = datetime.now() # Updates the last active time for the session
             return session_id, self.sessions[session_id]
-       
-        
-        
+
         # If session_id is missing or invalid, create a new session using a UUID.
         # Store it in sessions and set last_active to the current time.
         # The session is created with the specified model, system prompt, and tools.
@@ -57,7 +54,10 @@ class SessionManager:
         return session_id, session
     
     async def send_message(self, session_id, message):
-        session = self.sessions [session_id]
+        session = self.sessions.get(session_id)
+        if session is None:
+            raise ValueError(f"Session {session_id} not found or expired")
+
         self.last_active[session_id] = datetime.now() # Updates the last active time for the session.
         self.history[session_id].append({"role": "user", "content": message}) # Adds the message to the session history.
         
@@ -72,9 +72,8 @@ class SessionManager:
         now = datetime.now()
         expired = [
             session_id for session_id, last in self.last_active.items() if now - last > self.timeout
-        ] 
-        
-        
+        ]
+
         for session_id in expired:
             await self.sessions[session_id].destroy() # Destroys the session in Copilot.
             del self.sessions[session_id] # Removes the session from the sessions dict.
