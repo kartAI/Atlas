@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ArrowUp, Paperclip, FileText, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export function ChatInterface() {
   const [messages, setMessages] = useState([]);
@@ -144,7 +146,9 @@ export function ChatInterface() {
                 {/* Text bubble - only if text exists */}
                 {hasText && (
                   <div className={`chat-bubble chat-bubble--${msg.role}`}>
-                    {msg.text}
+                    {msg.role === 'assistant'
+                      ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                      : msg.text}
                   </div>
                 )}
               </div>

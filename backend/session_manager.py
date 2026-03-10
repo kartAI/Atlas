@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from copilot import CopilotClient, PermissionHandler
 from config import DEMO_MODE, MODEL_NAME, SYSTEM_PROMPT, SESSION_TIMEOUT_MINUTES
-from tools import list_kommuner_tool, list_vernetyper_tool, buffer_search_tool # Demo functionality to list municipalities and protection types from the database. Can be used in the system prompt to make it available for the model to call.
+from tools import list_kommuner_tool, list_vernetyper_tool, buffer_search_tool, list_documents_tool, fetch_document_tool # Demo functionality
 
 
 def strict_permission_handler(*_args, **_kwargs):
@@ -45,8 +45,15 @@ class SessionManager:
                 "mode": "append",
                 "content": SYSTEM_PROMPT
             },
-            "tools": [list_kommuner_tool, list_vernetyper_tool, buffer_search_tool], # Adds the tools to the session, making them available for the model to call.
-            "on_permission_request": permission_handler # In non-demo mode this denies by default; replace with allowlist/manual approval as needed.
+            "tools": [list_kommuner_tool, list_vernetyper_tool, buffer_search_tool, list_documents_tool, fetch_document_tool], # Adds the tools to the session, making them available for the model to call.
+            "on_permission_request": permission_handler, # In non-demo mode this denies by default; replace with allowlist/manual approval as needed.
+            "mcp_servers": {
+                "database": {
+                    "type": "sse",
+                    "url": "http://localhost:8002/sse",
+                    "tools": ["*"],  # Expose all MCP tools: list_tables, describe_table, query_database
+                }
+            },
         })
         self.sessions[session_id] = session
         self.last_active[session_id] = datetime.now()
@@ -61,7 +68,7 @@ class SessionManager:
         self.last_active[session_id] = datetime.now() # Updates the last active time for the session.
         self.history[session_id].append({"role": "user", "content": message}) # Adds the message to the session history.
         
-        response = await session.send_and_wait({"prompt": message})
+        response = await session.send_and_wait({"prompt": message}, timeout=180)
         content = response.data.content
         self.history[session_id].append({"role": "assistant", "content": content}) # Adds the response to the session history.
         return content

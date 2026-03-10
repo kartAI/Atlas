@@ -242,10 +242,23 @@
   padding: 0.5rem 0.9rem;
   border-radius: 18px;
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.7;
   word-break: break-word;
   margin-bottom: 5px;
 }
+
+.chat-bubble--assistant table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6rem 0;
+}
+.chat-bubble--assistant th,
+.chat-bubble--assistant td {
+  border: 1px solid #d0d0d0;
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+}
+.chat-bubble--assistant p { margin: 0.4rem 0; }
 
 .chat-bubble--user {
   background: var(--primary-color);

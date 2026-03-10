@@ -1,11 +1,14 @@
 from copilot import Tool
 from db import query
+import asyncio
 import json
 import logging
 from config import (
     BUFFER_DISTANCE_MAX_METERS,
     BUFFER_DISTANCE_MIN_METERS,
     BUFFER_RESULT_LIMIT,
+    list_documents,
+    fetch_document,
 )
 
 logger = logging.getLogger(__name__)
@@ -169,3 +172,58 @@ buffer_search_tool = Tool(
     },
     handler=handle_buffer_search
 )
+
+# DEMO FUNCTIONALITY - AZURE BLOB STORAGE DOCUMENT TOOLS
+
+async def handle_list_documents(invocation):
+    """List all available PDF documents in Azure Blob Storage."""
+    try:
+        docs = list_documents()
+        return {
+            "textResultForLlm": json.dumps(docs, ensure_ascii=False),
+            "resultType": "success"
+        }
+    except Exception as exc:
+        logger.exception("list_documents failed error_type=%s", type(exc).__name__)
+        return {"textResultForLlm": "Feil ved henting av dokumentliste.", "resultType": "error"}
+
+list_documents_tool = Tool(
+    name="list_documents",
+    description="List alle tilgjengelige PDF-dokumenter i Azure Blob Storage.",
+    parameters={"type": "object", "properties": {}, "required": []},
+    handler=handle_list_documents
+)
+
+
+async def handle_fetch_document(invocation):
+    """Fetch the full text content of a specific document from Azure Blob Storage."""
+    name = invocation["arguments"].get("name", "")
+    if not name:
+        return {"textResultForLlm": "Mangler dokumentnavn.", "resultType": "error"}
+    try:
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(None, fetch_document, name)
+        return {
+            "textResultForLlm": json.dumps({"name": name, "content": text}, ensure_ascii=False),
+            "resultType": "success"
+        }
+    except Exception as exc:
+        logger.exception("fetch_document failed name=%s error_type=%s", name, type(exc).__name__)
+        return {"textResultForLlm": f"Kunne ikke hente dokumentet '{name}'.", "resultType": "error"}
+
+fetch_document_tool = Tool(
+    name="fetch_document",
+    description="Hent tekstinnholdet fra et spesifikt PDF-dokument i Azure Blob Storage. VIKTIG: Kall alltid list_documents først for å få det eksakte filnavnet før du bruker dette verktøyet.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Det eksakte filnavnet på dokumentet slik det returneres av list_documents, f.eks. 'KU Landskap 16.12.25 (1).PDF'"
+            }
+        },
+        "required": ["name"]
+    },
+    handler=handle_fetch_document
+)
+# DEMO END

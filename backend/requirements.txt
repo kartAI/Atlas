@@ -6,3 +6,6 @@ azure-storage-blob
 pymupdf
 psycopg[binary]
 psycopg-pool
+mcp[cli]
+asyncpg
+starlette
