@@ -4,6 +4,8 @@ import { ArrowUp, Paperclip, FileText, X } from 'lucide-react';
 export function ChatInterface() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [sessionId, setSessionId] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null); // Placeholder for document selection logic.
   const bottomRef = useRef(null);
   const [attachments, setAttachments] = useState([]);
   const fileInputRef = useRef(null);
@@ -13,12 +15,52 @@ export function ChatInterface() {
   }, [messages]);
 
 
-  function handleSend() {
+  async function handleSend() {
     const trimmed = input.trim();
     if (!trimmed && attachments.length === 0) return;
-    setMessages((prev) => [...prev, { role: 'user', text: trimmed, attachments: [...attachments] }]);
+
+    const userMessage = {
+      role: "user",
+      text: trimmed,
+      attachments: [...attachments]
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setAttachments([]);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: trimmed,
+          session_id: sessionId,
+          document: selectedDocument || null,
+        })
+      });
+
+      const data = await res.json();
+      setSessionId(data.session_id);
+
+      const aiMessage = {
+        role: "assistant",
+        text: data.reply,
+        attachments: []
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+
+    } catch (err) {
+      console.error("Chat error:", err);
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "Kunne ikke kontakte serveren.", attachments: [] }
+      ]);
+    }
   }
 
   function handleKeyDown(e) {
