@@ -17,6 +17,12 @@ MODEL_NAME = os.getenv("MODEL_NAME", "your-model-name-here")
 
 # Session management configuration
 SESSION_TIMEOUT_MINUTES = int(os.getenv("SESSION_TIMEOUT_MINUTES", "15"))
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("1", "true", "yes", "on")
+
+# Buffer search hardening
+BUFFER_DISTANCE_MIN_METERS = int(os.getenv("BUFFER_DISTANCE_MIN_METERS", "10"))
+BUFFER_DISTANCE_MAX_METERS = int(os.getenv("BUFFER_DISTANCE_MAX_METERS", "50000"))
+BUFFER_RESULT_LIMIT = int(os.getenv("BUFFER_RESULT_LIMIT", "200"))
 
 # System prompt configuration - define the behavior of the AI assistant
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", """

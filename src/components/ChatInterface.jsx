@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, FileText, X } from 'lucide-react';
+import { ArrowUp, Paperclip, FileText, X } from 'lucide-react';
 
 export function ChatInterface() {
   const [messages, setMessages] = useState([]);
@@ -14,9 +14,14 @@ export function ChatInterface() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function handleSend() {
-  const trimmed = input.trim();
-  if (!trimmed && attachments.length === 0) return;
+
+  function handleSend() {
+    const trimmed = input.trim();
+    if (!trimmed && attachments.length === 0) return;
+    setMessages((prev) => [...prev, { role: 'user', text: trimmed, attachments: [...attachments] }]);
+    setInput('');
+    setAttachments([]);
+  }
 
   const userMessage = {
     role: "user",
@@ -111,35 +116,40 @@ export function ChatInterface() {
             
             return (
               <div key={i} className={`message-wrapper message-wrapper--${msg.role}`}>
+                {/* Wrapper for all attachments to sit on same line */}
+                {(images.length > 0 || files.length > 0) && (
+                  <div className="message-attachments-wrapper">
+                    {/* Images - use compact preview if there's text or multiple images */}
+                    {images.length > 0 && (
+                      <div className={`message-image-attachments ${hasText || images.length > 1 ? 'message-image-attachments--preview' : ''}`}>
+                        {images.map((att) => (
+                          <div key={att.id} className="attachment-image">
+                            <img src={att.preview} alt={att.name} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Files - use compact preview if there's text or multiple files */}
+                    {files.length > 0 && (
+                      <div className={`message-file-attachments ${hasText || files.length > 1 ? 'message-file-attachments--preview' : ''}`}>
+                        {files.map((att) => (
+                          <div key={att.id} className="attachment-card">
+                            <div className="attachment-file-icon">
+                              <FileText size={26} />
+                            </div>
+                            <span className="attachment-file-name">{att.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Text bubble - only if text exists */}
                 {hasText && (
                   <div className={`chat-bubble chat-bubble--${msg.role}`}>
                     {msg.text}
-                  </div>
-                )}
-                
-                {/* Images - use compact preview if there's text, full size if not */}
-                {images.length > 0 && (
-                  <div className={`message-image-attachments ${hasText ? 'message-image-attachments--preview' : ''}`}>
-                    {images.map((att) => (
-                      <div key={att.id} className="attachment-image">
-                        <img src={att.preview} alt={att.name} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Files - use compact preview if there's text, full size if not */}
-                {files.length > 0 && (
-                  <div className={`message-file-attachments ${hasText ? 'message-file-attachments--preview' : ''}`}>
-                    {files.map((att) => (
-                      <div key={att.id} className="attachment-card">
-                        <div className="attachment-file-icon">
-                          <FileText size={28} />
-                        </div>
-                        <span className="attachment-file-name">{att.name}</span>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>
@@ -195,7 +205,7 @@ export function ChatInterface() {
           onKeyDown={handleKeyDown}
           placeholder="Skriv en melding..."
         />
-        <button onClick={handleSend}><Send size={18} /></button>
+        <button onClick={handleSend}><ArrowUp size={18} /></button>
       </div>
     </div>
   );
