@@ -4,7 +4,7 @@ import asyncio
 from dotenv import load_dotenv
 load_dotenv()
 
-from config import ALLOWED_ORIGINS
+from config import ALLOWED_ORIGINS, DEMO_MODE
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -72,6 +72,8 @@ async def get_history(session_id: str):
 # TESTING DATABASE CONNECTIVITY AND QUERY EXECUTION
 @app.get("/api/test-db")
 async def test_db():
+    if not DEMO_MODE:
+        return {"error": "This endpoint is only available in demo mode."}
     result = await query("SELECT * FROM kulturmiljoer.kommunenummer LIMIT 5")
     return {"data": result} # Endpoint to test database connection and query execution.
 # TESTING END
