@@ -28,30 +28,45 @@ function App() {
   const toggleTheme = () => setTheme(t=> t === 'dark' ? 'light' : 'dark');
 
   const [layers, setLayers] = useState([{
-    id: 'osm',
-    name: 'OpenStreetMap',
+    id: 'topo',
+    name: 'Topografisk (farge)',
     type: 'tile',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    url: 'https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png',
     visible: true,
   },
-  {    
-    id: 'topo',
-    name: 'Topografisk',
-    type: 'tile',
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    visible: false,
-  }, 
   {
-    id: 'satellite',
-    name: 'Satellite',
+    id: 'topo-raster',
+    name: 'Topografisk (raster)',
+    type: 'tile',
+    url: 'https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png',
+    visible: false,
+  },
+  {    
+    id: 'graa',
+    name: 'Topografisk (gråtone)',
+    type: 'tile',
+    url: 'https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png',
+    visible: false,
+  },
+  {
+    id: 'sjo',
+    name: 'Sjøkart',
+    type: 'tile',
+    url: 'https://cache.kartverket.no/v1/wmts/1.0.0/sjokartraster/default/webmercator/{z}/{y}/{x}.png',
+    visible: false,
+  },
+  {
+    id: 'ortofoto',
+    name: 'Ortofoto / Satelitt',
     type: 'tile',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     visible: false,
+    attribution: '© Esri, Maxar, Earthstar Geographics',
   }
   ]);
 
   const toggleLayer = (layerId) => {
-    setLayers(layers.map(layer => ({
+    setLayers(prev => prev.map(layer => ({
       ...layer,
       visible: layer.id === layerId,
     })));
