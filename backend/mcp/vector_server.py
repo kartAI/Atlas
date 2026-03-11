@@ -4,12 +4,11 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, cast
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from fastmcp import FastMCP
 from db import init_db_pool, close_pool, get_connection
-from typing import cast
 
 # gis-mcp imports used for create_map and save_output are "helpers"
 from gis_mcp.visualize.map_tool import create_map
@@ -47,7 +46,7 @@ async def vector_server_lifespan(server: FastMCP):
 vector_mcp = FastMCP(lifespan=vector_server_lifespan)
 
 # create_map is registered directly from gis-mcp (requires gis-mcp[visualize])
-vector_mcp.tool()(create_map)
+vector_mcp.tool()(create_map) # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +57,7 @@ vector_mcp.tool()(create_map)
 @vector_mcp.tool()
 def buffer(geometry: str, distance: float, resolution: int = 16,
           join_style: int = 1, mitre_limit: float = 5.0,
-          single_sided: bool = False) -> Dict[str, Any]:
+          single_sided: bool = False) -> dict[str, Any]:
     """
     Creates a buffer zone around a geometry.
     Use this when the user asks about areas within a certain distance of a location,
@@ -87,7 +86,7 @@ def buffer(geometry: str, distance: float, resolution: int = 16,
 
 
 @vector_mcp.tool()
-def intersection(geometry1: str, geometry2: str) -> Dict[str, Any]:
+def intersection(geometry1: str, geometry2: str) -> dict[str, Any]:
     """
     Finds the overlapping area between two geometries.
     Use this when the user asks what two areas have in common, overlap analysis,
@@ -110,7 +109,7 @@ def intersection(geometry1: str, geometry2: str) -> Dict[str, Any]:
 
 
 @vector_mcp.tool()
-def envelope(geometry: str) -> Dict[str, Any]:
+def envelope(geometry: str) -> dict[str, Any]:
     """
     Returns the bounding box (minimum enclosing rectangle) of a geometry.
     Use this when the user asks for the extent, bounding box, or spatial bounds of a feature.
@@ -131,7 +130,7 @@ def envelope(geometry: str) -> Dict[str, Any]:
 
 
 @vector_mcp.tool()
-def get_coordinates(geometry: str) -> Dict[str, Any]:
+def get_coordinates(geometry: str) -> dict[str, Any]:
     """
     Extracts the coordinate pairs from a geometry.
     Use this when the user wants to know the actual lon/lat or x/y values of a geometry,
@@ -152,7 +151,7 @@ def get_coordinates(geometry: str) -> Dict[str, Any]:
 
 
 @vector_mcp.tool()
-def geometry_to_geojson(geometry: str) -> Dict[str, Any]:
+def geometry_to_geojson(geometry: str) -> dict[str, Any]:
     """
     Converts a WKT geometry string to GeoJSON format.
     Use this when the result needs to be displayed on a map, sent to the frontend,
@@ -173,7 +172,7 @@ def geometry_to_geojson(geometry: str) -> Dict[str, Any]:
 
 
 @vector_mcp.tool()
-def geojson_to_geometry(geojson: Dict[str, Any]) -> Dict[str, Any]:
+def geojson_to_geometry(geojson: dict[str, Any]) -> dict[str, Any]:
     """
     Converts a GeoJSON geometry object to WKT format.
     Use this when a tool or the user provides GeoJSON and another tool requires WKT as input.
@@ -197,7 +196,7 @@ def geojson_to_geometry(geojson: Dict[str, Any]) -> Dict[str, Any]:
 
 @vector_mcp.tool()
 def point_in_polygon(points_path: str, polygons_path: str,
-                    output_path: Optional[str] = None) -> Dict[str, Any]:
+                    output_path: str | None = None) -> dict[str, Any]:
     """
     Checks which points fall inside which polygons using a spatial join.
     Use this when the user wants to know if locations are inside a protected area,
@@ -237,11 +236,11 @@ def point_in_polygon(points_path: str, polygons_path: str,
 
 @vector_mcp.tool()
 def save_results(
-    data: Dict[str, Any],
-    filename: Optional[str] = None,
-    formats: Optional[List[str]] = None,
+    data: dict[str, Any],
+    filename: str | None = None,
+    formats: list[str] | None = None,
     folder: str = "outputs"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Saves the result from any tool to one or more file formats (JSON, CSV, GeoJSON, Shapefile, etc.).
     Only call this when the user explicitly asks to save or export results.
@@ -290,10 +289,10 @@ async def get_verdensarv_sites() -> str:
                     return "No world heritage sites found in database."
                 results = [
                     {
-                        "navn": row["navn"],
-                        "vernedato": row["vernedato"].isoformat() if row["vernedato"] else None,
-                        "informasjon": row["informasjon"],
-                        "geojson": row["geojson"],
+                        "navn": dict(row)["navn"],
+                        "vernedato": dict(row)["vernedato"].isoformat() if dict(row)["vernedato"] else None,
+                        "informasjon": dict(row)["informasjon"],
+                        "geojson": dict(row)["geojson"],
                     }
                     for row in rows
                 ]
