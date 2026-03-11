@@ -9,9 +9,12 @@
   --icon:             #1a1a1a;
   --text-input-area:  #ffffff;
   --file-attachments: #3d3d3d;
+  --file-icon:        #6d6b6b;
   --border:           rgba(81, 80, 80, 0.6);
   --chat-empty:       #666;
   --menus:            #dddddde0;
+  --menu-active:      rgba(38, 190, 118, 0.12);
+
 }
 
 /* Light theme overrides */
@@ -26,7 +29,9 @@
   --hover:            rgba(0, 0, 0, 0.06);
   --chat-empty:       #666;
   --file-attachments: #4b4b4b;
+  --file-icon:        #6d6b6b;
   --menus:            #202020;
+  --menu-active:      rgba(31, 201, 122, 0.316);
 }
 .app {
   /* App styles here */
@@ -154,8 +159,8 @@
 }
 
 .sidebar-item.active {
-  background: rgba(38, 190, 118, 0.12);
-  color: var(--secondary-color);
+  background: var(--menu-active);
+  color: var(--menus);
   box-shadow: inset 3px 0 0 var(--secondary-color);
 }
 
@@ -236,14 +241,15 @@
 .theme-toggle {
   background: none;
   border: none;
-  color: var(--hover-text);
+  color: var(--menus);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 8px;
 }
 
 .theme-toggle:hover {
-  color: var(--primary-color);
+  color: var(--hover-text);
+  transform: scale(1.1);
 }
 
 .chat-interface {
@@ -354,8 +360,6 @@
   border-radius: 10px;
   border: 1px solid var(--soft-bg);
   background: var(--bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   color: var(--menus);
   cursor: pointer;
   display: flex;
@@ -367,23 +371,23 @@
 }
 
 .map-layers-toggle:hover {
-  background: var(--soft-bg);
-  color: var(--primary-color);
+  background: var(--bg);
+  color: var(--hover-text);
   transform: scale(1.06);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .map-layers-toggle.active {
-  background: rgba(38, 190, 118, 0.15);
+  background: var(--bg);
   color: var(--primary-color);
-  border-color: rgba(38, 190, 118, 0.25);
+  border-color: var(--primary-color);
 }
 
 .map-layers-dropdown {
   background: var(--bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--soft-bg);
+  border: 1px solid var(--bg);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   min-width: clamp(180px, 22vw, 260px);
@@ -445,7 +449,7 @@
   width: clamp(18px, 2vw, 22px);
   height: clamp(18px, 2vw, 22px);
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  border: 2px solid var(--soft-bg);
   position: relative;
   transition: border-color 0.25s;
   flex-shrink: 0;
@@ -453,6 +457,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.map-layers-label:hover .map-layers-radio:not(.active) {
+  border-color: var(--hover-text);
+  color: var(--hover-text);
 }
 
 .map-layers-radio.active {
@@ -489,7 +498,7 @@
   height: 80px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--soft-bg);
+  background: var(--file-attachments);
   flex-shrink: 0;
 }
 
@@ -505,7 +514,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--soft-bg);
+  color: var(--file-icon);
 }
 
 .attachment-preview-strip .attachment-info {
