@@ -177,15 +177,11 @@ buffer_search_tool = Tool(
 
 async def handle_list_documents(invocation):
     """List all available PDF documents in Azure Blob Storage."""
-    try:
-        docs = list_documents()
-        return {
-            "textResultForLlm": json.dumps(docs, ensure_ascii=False),
-            "resultType": "success"
-        }
-    except Exception as exc:
-        logger.exception("list_documents failed error_type=%s", type(exc).__name__)
-        return {"textResultForLlm": "Feil ved henting av dokumentliste.", "resultType": "error"}
+    docs = list_documents()
+    return {
+        "textResultForLlm": json.dumps(docs, ensure_ascii=False),
+        "resultType": "success"
+    }
 
 list_documents_tool = Tool(
     name="list_documents",
