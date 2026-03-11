@@ -6,3 +6,6 @@ azure-storage-blob
 pymupdf
 psycopg[binary]
 psycopg-pool
+
+# GIS dependencies — gis-mcp[visualize] includes shapely, geopandas, rasterio, fastmcp, and visualization libs (matplotlib, folium, pydeck).
+gis-mcp[visualize]

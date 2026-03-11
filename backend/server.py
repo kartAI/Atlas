@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from copilot import CopilotClient
 from session_manager import SessionManager
-from db import connect_db, disconnect_db, query
+from db import init_db_pool, close_pool, query
 from config import list_documents, fetch_document # Demo functionality
 
 client = CopilotClient()
@@ -14,10 +14,10 @@ manager = SessionManager(client)
 @asynccontextmanager
 async def lifespan(app):
      await client.start() # Starts the Copilot client when the server starts.
-     await connect_db() # Connects to the database when the server starts.
+     await init_db_pool() # Connects to the database when the server starts.
      yield
      await client.stop() # Stops the Copilot client when the server shuts down.
-     await disconnect_db() # Disconnects from the database when the server shuts down.   
+     await close_pool() # Disconnects from the database when the server shuts down.   
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(

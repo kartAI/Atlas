@@ -35,6 +35,9 @@ async def _create_pool(url: str) -> AsyncConnectionPool | None:
         
 async def init_db_pool() -> bool:
     global _pool
+    if not DATABASE_URL:
+        logger.error("DATABASE_URL is not set in environment.")
+        return False
     _pool = await _create_pool(DATABASE_URL)
     return _pool is not None
 
@@ -53,6 +56,8 @@ def get_connection():
     return _pool.connection()
 
 async def query(sql, params=None):
+    if _pool is None:
+        raise RuntimeError("pool is not initialized.")
     async with _pool.connection() as conn:
         async with conn.cursor() as cur:
             await cur.execute(sql, params)
