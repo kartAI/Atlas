@@ -699,3 +699,96 @@
 .message-file-attachments--preview .attachment-file-name {
   font-size: 0.7rem;
 }
+
+/* Kartlag Panel */
+.kartlag-panel {
+  padding-top: 8px;
+}
+
+.kartlag-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-mute);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.kartlag-empty {
+  color: var(--text-mute);
+  font-size: 0.85rem;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+
+.kartlag-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kartlag-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--soft-bg);
+  gap: 10px;
+}
+
+.kartlag-name {
+  font-size: 0.88rem;
+  color: var(--hover-text);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kartlag-name:hover {
+  text-decoration: underline;
+}
+
+.kartlag-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.kartlag-btn {
+  background: none;
+  border: none;
+  color: var(--text-mute);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kartlag-btn:hover {
+  background: var(--soft-bg);
+  color: var(--hover-text);
+}
+
+.kartlag-btn--delete:hover {
+  color: #e05555;
+}
+
+.kartlag-export {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+}
