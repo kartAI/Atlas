@@ -19,7 +19,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Create the FastMCP server based on the FastMCP V2 framework.
 
-mcp = FastMCP("gruppe8-db")
+mcp = FastMCP("db_fast_server")
 
 
 async def get_connection() -> asyncpg.Connection:
@@ -30,7 +30,7 @@ async def get_connection() -> asyncpg.Connection:
 @mcp.tool
 async def list_tables() -> str:
     """
-    List all available tables and their schemas in the gruppe8_2026 database.
+    List all available tables and their schemas in the databse.
     Call this first to discover what data is available.
     """
     conn = await get_connection()
@@ -77,7 +77,7 @@ async def describe_table(schema: str, table: str) -> str:
 @mcp.tool
 async def query_database(sql: str) -> str:
     """
-    Execute a read-only SELECT query against the gruppe8_2026 database.
+    Execute a read-only SELECT query against the database.
     Returns the results as a JSON array. Only SELECT statements are permitted.
 
     Args:

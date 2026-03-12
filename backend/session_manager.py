@@ -38,24 +38,24 @@ class SessionManager:
             },
            
             # The orchestrator (Copilot) can now pick from three specialised servers:
-            #   - gruppe8-db:   raw SQL tools for exploring and querying the database
-            #   - gruppe8-geo:  domain-specific geo/KU tools (buffer search, kommuner etc.)
-            #   - gruppe8-docs: Azure Blob document tools (list + fetch PDFs)
-            # Add new MCP servers here as you build them — no changes to server.py needed.
+            #   - db:   raw SQL tools for exploring and querying the database
+            #   - geo_server:  domain-specific geo/KU tools (buffer search, kommuner etc.)
+            #   - docs_server: Azure Blob document tools (list + fetch PDFs)
+            # Add new MCP servers here as you build them.
             "mcp_servers": {
                 "database": {
                     "type": "http",
-                    "url": "http://localhost:8000/mcp/db/mcp",
+                    "url": "http://localhost:8000/mcp/db/mcp", # Placeholder
                     "tools": ["*"],
                 },
                 "geo": {
                     "type": "http",
-                    "url": "http://localhost:8000/mcp/geo/mcp",
+                    "url": "http://localhost:8000/mcp/geo/mcp",# Placeholder
                     "tools": ["*"],
                 },
                 "docs": {
                     "type": "http",
-                    "url": "http://localhost:8000/mcp/docs/mcp",
+                    "url": "http://localhost:8000/mcp/docs/mcp", # Placeholder
                     "tools": ["*"],
                 },
             },

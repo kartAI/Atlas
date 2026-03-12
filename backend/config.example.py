@@ -10,7 +10,7 @@ HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 
 # CORS Middleware configuration
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",") # Placeholder URL for frontend.
 
 # AI Model configuration
 MODEL_NAME = os.getenv("MODEL_NAME", "your-model-name-here")

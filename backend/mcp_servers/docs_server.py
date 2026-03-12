@@ -13,7 +13,7 @@ from config import list_documents as _list_documents, fetch_document as _fetch_d
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("gruppe8-docs")
+mcp = FastMCP("blob_docs")
 
 
 @mcp.tool

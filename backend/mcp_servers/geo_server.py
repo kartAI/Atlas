@@ -1,8 +1,4 @@
 """
-IMPORTANT:
-These tools were previously registered via the Copilot SDK in tools.py.
-They are now exposed as a standalone MCP server that the orchestrator can call.
-
 Tools:
   - list_kommuner:    List municipality numbers and names.
   - list_vernetyper:  List all protection types for cultural environments.
@@ -22,7 +18,7 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("gruppe8-geo")
+mcp = FastMCP("geo_server")
 
 
 @mcp.tool
