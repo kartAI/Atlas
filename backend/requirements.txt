@@ -1,8 +1,13 @@
 fastapi
 uvicorn
+starlette
 python-dotenv
-github-copilot-sdk
-azure-storage-blob
-pymupdf
+fastmcp
+mcp[cli]
+asyncpg
 psycopg[binary]
 psycopg-pool
+azure-storage-blob
+pymupdf
+github-copilot-sdk
+pydantic

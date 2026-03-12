@@ -27,3 +27,5 @@ config.py
 
 # Python cache and virtual environment
 __pycache__/
+.venv/
+venv/

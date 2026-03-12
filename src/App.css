@@ -285,6 +285,29 @@
   margin-bottom: 5px;
 }
 
+.chat-bubble--assistant table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.85em;
+}
+
+.chat-bubble--assistant th,
+.chat-bubble--assistant td {
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.chat-bubble--assistant th {
+  background: rgba(255,255,255,0.1);
+  font-weight: 600;
+}
+
+.chat-bubble--assistant tr:nth-child(even) {
+  background: rgba(255,255,255,0.05);
+}
+
 .chat-bubble--user {
   background: var(--primary-color);
   color: var(--text);
