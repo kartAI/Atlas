@@ -1,9 +1,10 @@
 import { ChatInterface } from './ChatInterface';
+import { Analysis } from './Analysis';
 
 const PANEL_COMPONENTS = {
     'Chatbot': ChatInterface,
     'Kartlag': () => <h2>Kartlag</h2>, // Replace with real component later
-    'Analyse': () => <h2>Analyse</h2>, // Replace with real component later
+    'Analyse': Analysis,
     'Eksporter': () => <h2>Eksporter</h2> // Replace with real component later
 };
 
