@@ -1,20 +1,20 @@
 import { useState } from 'react';
 
-const FILTER_OPTIONS = ['Alle', 'Overlegg', 'Geometri', 'Aggregering'];
+const FILTER_OPTIONS = ['Alle', 'Overlegg', 'Buffer', 'Forenkling', 'Geometri'];
 
 const ALL_TOOLS = [
-  { name: 'Buffer',          icon: '⬡', category: 'Geometri',     desc: 'Opprett en buffersone rundt geometrier',                colorClass: 'tool-green'  },
-  { name: 'Snitt',           icon: '⊗', category: 'Overlegg',     desc: 'Finn overlappende areal mellom to lag',                 colorClass: 'tool-blue'   },
-  { name: 'Forening',        icon: '⊕', category: 'Overlegg',     desc: 'Slå sammen geometrier fra to lag til ett',              colorClass: 'tool-blue'   },
-  { name: 'Klipp',           icon: '✂', category: 'Geometri',     desc: 'Klipp et lag til grensen av et annet',                  colorClass: 'tool-green'  },
-  { name: 'Oppløs',          icon: '◎', category: 'Aggregering',  desc: 'Aggreger og slå sammen objekter etter felles attributt', colorClass: 'tool-amber'  },
-  { name: 'Differanse',      icon: '⊖', category: 'Overlegg',     desc: 'Trekk én geometri fra en annen',                        colorClass: 'tool-blue'   },
-  { name: 'Konveks Skrog',   icon: '△', category: 'Geometri',     desc: 'Beregn konvekst skrog for et sett med geometrier',      colorClass: 'tool-green'  },
-  { name: 'Sentroid',        icon: '⊙', category: 'Geometri',     desc: 'Beregn sentroiden til en geometri',                    colorClass: 'tool-green'  },
-  { name: 'Forenkle',        icon: '〜', category: 'Geometri',    desc: 'Forenkle geometri uten å ødelegge topologien',          colorClass: 'tool-green'  },
-  { name: 'Romlig Kobling',  icon: '⋈', category: 'Overlegg',     desc: 'Koble attributter basert på romlige relasjoner',        colorClass: 'tool-blue'   },
-  { name: 'Nærmeste Punkt',  icon: '↔', category: 'Geometri',     desc: 'Finn nærmeste punkter mellom to geometrier',           colorClass: 'tool-green'  },
-  { name: 'Voronoi',         icon: '⬢', category: 'Aggregering',  desc: 'Generer et Voronoi-diagram fra et punktlag',            colorClass: 'tool-amber'  },
+  { name: 'Buffer',         icon: '⬡', category: 'Buffer', desc: 'Opprett en buffersone rundt geometrier',                colorClass: 'tool-purple' },
+  { name: 'Snitt',          icon: '⊗', category: 'Overlegg',          desc: 'Finn overlappende areal mellom to lag',                 colorClass: 'tool-blue'   },
+  { name: 'Forening',       icon: '⊕', category: 'Overlegg',          desc: 'Slå sammen geometrier fra to lag til ett',              colorClass: 'tool-blue'   },
+  { name: 'Klipp',          icon: '✂', category: 'Geometri',          desc: 'Klipp et lag til grensen av et annet',                  colorClass: 'tool-green'  },
+  { name: 'Oppløs',         icon: '◎', category: 'Forenkling',    desc: 'Aggreger og slå sammen objekter etter felles attributt', colorClass: 'tool-amber'  },
+  { name: 'Differanse',     icon: '⊖', category: 'Overlegg',          desc: 'Trekk én geometri fra en annen',                        colorClass: 'tool-blue'   },
+  { name: 'Konveks Skrog',  icon: '△', category: 'Geometri',          desc: 'Beregn konvekst skrog for et sett med geometrier',      colorClass: 'tool-green'  },
+  { name: 'Sentroid',       icon: '⊙', category: 'Geometri',          desc: 'Beregn sentroiden til en geometri',                     colorClass: 'tool-green'  },
+  { name: 'Forenkle',       icon: '〜', category: 'Forenkling',   desc: 'Forenkle geometri uten å ødelegge topologien',          colorClass: 'tool-amber'  },
+  { name: 'Romlig Kobling', icon: '⋈', category: 'Overlegg',          desc: 'Koble attributter basert på romlige relasjoner',        colorClass: 'tool-blue'   },
+  { name: 'Nærmeste Punkt', icon: '↔', category: 'Buffer', desc: 'Finn nærmeste punkter mellom to geometrier',            colorClass: 'tool-purple' },
+  { name: 'Voronoi',        icon: '⬢', category: 'Buffer', desc: 'Generer et Voronoi-diagram fra et punktlag',            colorClass: 'tool-purple' },
 ];
 
 const FEATURED_TOOLS = ALL_TOOLS.slice(0, 6);
