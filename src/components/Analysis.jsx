@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFilter } from '@fortawesome/free-solid-svg-icons';
 
-const FILTER_OPTIONS = ['Alle', 'Overlegg', 'Buffer', 'Forenkling', 'Geometri'];
+const FILTER_OPTIONS = ['Overlegg', 'Buffer', 'Forenkling', 'Geometri'];
 
 const ALL_TOOLS = [
   { name: 'Buffer',         icon: '⬡', category: 'Buffer', desc: 'Opprett en buffersone rundt geometrier',                colorClass: 'tool-purple' },
@@ -34,7 +36,7 @@ export function Analysis() {
     });
   }
 
-  const sourceTools = (showAll || activeFilters.size > 0) ? ALL_TOOLS : FEATURED_TOOLS;
+  const sourceTools = showAll ? ALL_TOOLS : FEATURED_TOOLS;
   const filteredTools = sourceTools.filter(t =>
     (activeFilters.size === 0 || activeFilters.has(t.category)) &&
     t.name.toLowerCase().includes(search.toLowerCase())
@@ -71,7 +73,7 @@ export function Analysis() {
             className={`analysis-filter-btn${filterOpen ? ' active' : ''}`}
             onClick={() => setFilterOpen(o => !o)}
           >
-            ⚙ Filter
+            <FontAwesomeIcon icon={faFilter} />
             {(activeFilters.size > 0 || sortAlpha) && (
               <span className="analysis-filter-badge">{activeFilters.size + (sortAlpha ? 1 : 0)}</span>
             )}
@@ -79,7 +81,7 @@ export function Analysis() {
           {filterOpen && (
             <div className="analysis-filter-dropdown">
               <div className="analysis-filter-section-label">Kategori</div>
-              {FILTER_OPTIONS.filter(o => o !== 'Alle').map(opt => (
+              {FILTER_OPTIONS.map(opt => (
                 <button
                   key={opt}
                   className={`analysis-filter-option${activeFilters.has(opt) ? ' active' : ''}`}

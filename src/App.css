@@ -813,7 +813,7 @@
   background: var(--soft-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--hover-text);
+  color: var(--text-mute);
   font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
@@ -823,6 +823,7 @@
 .analysis-filter-btn:hover {
   background: var(--soft-bg);
   border-color: var(--hover-text);
+  color: var(--hover-text);
 }
 
 .analysis-filter-btn.active {
@@ -859,7 +860,7 @@
   padding: 9px 15px;
   background: none;
   border: none;
-  color: var(--hover-text);
+  color: var(--text-mute);
   font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
@@ -868,11 +869,11 @@
 
 .analysis-filter-option:hover {
   background: var(--soft-bg);
+  color: var(--hover-text)
 }
 
 .analysis-filter-option.active {
   color: var(--primary-color);
-  font-weight: 600;
 }
 
 .analysis-filter-check {
@@ -920,7 +921,7 @@
   background: var(--soft-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--hover-text);
+  color: var(--text-mute);
   font-size: 0.65rem;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s, color 0.2s;
@@ -984,14 +985,14 @@
   font-weight: 700;
   color: #fff;
   margin-bottom: 5px;
-  line-height: 3;
+  line-height: 2.5;
 }
 
 .analysis-tool-box-desc {
   display: block;
   font-size: 1srem;
   color: rgba(255, 255, 255, 0.72);
-  line-height: 1.35;
+  line-height: 1.9;
 }
 
 .analysis-no-results {
