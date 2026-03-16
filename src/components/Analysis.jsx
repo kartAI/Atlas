@@ -36,14 +36,30 @@ export function Analysis() {
     });
   }
 
-  const sourceTools = showAll ? ALL_TOOLS : FEATURED_TOOLS;
+  const sourceTools = (showAll || activeFilters.size > 0) ? ALL_TOOLS : FEATURED_TOOLS;
   const filteredTools = sourceTools.filter(t =>
-    (activeFilters.size === 0 || activeFilters.has(t.category)) &&
+    (showAll || activeFilters.size === 0 || activeFilters.has(t.category)) &&
     t.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  let prioritizedTools = filteredTools;
+  let prioritizedCount = 0;
+
+  if (showAll && activeFilters.size > 0) {
+    const selectedTools = filteredTools.filter(t => activeFilters.has(t.category));
+    const otherTools = filteredTools.filter(t => !activeFilters.has(t.category));
+    prioritizedCount = selectedTools.length;
+    prioritizedTools = [...selectedTools, ...otherTools];
+  }
+
   const visibleBoxes = sortAlpha
-    ? [...filteredTools].sort((a, b) => a.name.localeCompare(b.name, 'nb'))
-    : filteredTools;
+    ? (showAll && activeFilters.size > 0
+      ? [
+          ...[...prioritizedTools.slice(0, prioritizedCount)].sort((a, b) => a.name.localeCompare(b.name, 'nb')),
+          ...[...prioritizedTools.slice(prioritizedCount)].sort((a, b) => a.name.localeCompare(b.name, 'nb')),
+        ]
+      : [...prioritizedTools].sort((a, b) => a.name.localeCompare(b.name, 'nb')))
+    : prioritizedTools;
 
   return (
     <div className="analysis-panel">

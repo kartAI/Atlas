@@ -878,10 +878,18 @@
 
 .analysis-filter-check {
   display: inline-block;
-  width: 14px;
+  width: 1em;
   margin-right: 6px;
-  font-size: 0.78rem;
+  font-size: inherit;
+  line-height: 1;
+  text-align: center;
   color: var(--primary-color);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.analysis-filter-check.visible {
+  opacity: 1;
 }
 
 .analysis-filter-clear {
@@ -967,7 +975,6 @@
 }
 
 .analysis-tool-box:active {
-  transform: translateY(-1px);
   filter: brightness(0.95);
 }
 
