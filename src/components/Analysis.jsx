@@ -1,22 +1,36 @@
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter } from '@fortawesome/free-solid-svg-icons';
+import {
+  Circle,
+  Scissors,
+  Ungroup,
+  SquareDot,
+  MinusCircle,
+  SquaresIntersect,
+  CircleDotDashed,
+  Layers,
+  Minimize2,
+  SquaresUnite,
+  MoveHorizontal,
+  LayoutGrid,
+} from 'lucide-react';
 
 const FILTER_OPTIONS = ['Overlegg', 'Buffer', 'Forenkling', 'Geometri'];
 
 const ALL_TOOLS = [
-  { name: 'Buffer',         icon: '⬡', category: 'Buffer', desc: 'Opprett en buffersone rundt geometrier',                colorClass: 'tool-purple' },
-  { name: 'Snitt',          icon: '⊗', category: 'Overlegg',          desc: 'Finn overlappende areal mellom to lag',                 colorClass: 'tool-blue'   },
-  { name: 'Forening',       icon: '⊕', category: 'Overlegg',          desc: 'Slå sammen geometrier fra to lag til ett',              colorClass: 'tool-blue'   },
-  { name: 'Klipp',          icon: '✂', category: 'Geometri',          desc: 'Klipp et lag til grensen av et annet',                  colorClass: 'tool-green'  },
-  { name: 'Oppløs',         icon: '◎', category: 'Forenkling',    desc: 'Aggreger og slå sammen objekter etter felles attributt', colorClass: 'tool-amber'  },
-  { name: 'Differanse',     icon: '⊖', category: 'Overlegg',          desc: 'Trekk én geometri fra en annen',                        colorClass: 'tool-blue'   },
-  { name: 'Konveks Skrog',  icon: '△', category: 'Geometri',          desc: 'Beregn konvekst skrog for et sett med geometrier',      colorClass: 'tool-green'  },
-  { name: 'Sentroid',       icon: '⊙', category: 'Geometri',          desc: 'Beregn sentroiden til en geometri',                     colorClass: 'tool-green'  },
-  { name: 'Forenkle',       icon: '〜', category: 'Forenkling',   desc: 'Forenkle geometri uten å ødelegge topologien',          colorClass: 'tool-amber'  },
-  { name: 'Romlig Kobling', icon: '⋈', category: 'Overlegg',          desc: 'Koble attributter basert på romlige relasjoner',        colorClass: 'tool-blue'   },
-  { name: 'Nærmeste Punkt', icon: '↔', category: 'Buffer', desc: 'Finn nærmeste punkter mellom to geometrier',            colorClass: 'tool-purple' },
-  { name: 'Voronoi',        icon: '⬢', category: 'Buffer', desc: 'Generer et Voronoi-diagram fra et punktlag',            colorClass: 'tool-purple' },
+  { name: 'Buffer',          icon: Circle,           category: 'Buffer',     desc: 'Opprett en buffersone rundt geometrier'                 },
+  { name: 'Snitt',           icon: SquaresIntersect, category: 'Overlegg',   desc: 'Finn overlappende areal mellom to lag'                  },
+  { name: 'Forening',        icon: Layers,           category: 'Overlegg',   desc: 'Slå sammen geometrier fra to lag til ett'               },
+  { name: 'Klipp',           icon: Scissors,         category: 'Geometri',   desc: 'Klipp et lag til grensen av et annet'                   },
+  { name: 'Oppløs',          icon: Ungroup,          category: 'Forenkling', desc: 'Aggreger og slå sammen objekter etter felles attributt' },
+  { name: 'Differanse',      icon: MinusCircle,      category: 'Overlegg',   desc: 'Trekk én geometri fra en annen'                         },
+  { name: 'Konveks Hylster', icon: SquareDot,        category: 'Geometri',   desc: 'Beregn konvekst hylster for et sett med geometrier'     },
+  { name: 'Sentroid',        icon: CircleDotDashed,  category: 'Geometri',   desc: 'Beregn sentroiden til en geometri'                      },
+  { name: 'Forenkle',        icon: Minimize2,        category: 'Forenkling', desc: 'Forenkle geometri uten å ødelegge topologien'           },
+  { name: 'Romlig Kobling',  icon: SquaresUnite,     category: 'Overlegg',   desc: 'Koble attributter basert på romlige relasjoner'         },
+  { name: 'Nærmeste Punkt',  icon: MoveHorizontal,   category: 'Buffer',     desc: 'Finn nærmeste punkter mellom to geometrier'             },
+  { name: 'Voronoi',         icon: LayoutGrid,       category: 'Buffer',     desc: 'Generer et Voronoi-diagram fra et punktlag'             },
 ];
 
 const FEATURED_TOOLS = ALL_TOOLS.slice(0, 6);
@@ -139,13 +153,18 @@ export function Analysis() {
 
       {/* Tool grid */}
       <div className="analysis-grid">
-        {visibleBoxes.length > 0 ? visibleBoxes.map(tool => (
-          <button key={tool.name} className={`analysis-tool-box ${tool.colorClass}`}>
-            <span className="analysis-tool-box-icon">{tool.icon}</span>
-            <span className="analysis-tool-box-name">{tool.name}</span>
-            <span className="analysis-tool-box-desc">{tool.desc}</span>
-          </button>
-        )) : (
+        {visibleBoxes.length > 0 ? visibleBoxes.map(tool => {
+          const Icon = tool.icon;
+          return (
+            <button key={tool.name} className={`analysis-tool-box`}>
+              <span className="analysis-tool-box-icon">
+                {typeof Icon === 'string' ? Icon : <Icon size={22} strokeWidth={2.1} />}
+              </span>
+              <span className="analysis-tool-box-name">{tool.name}</span>
+              <span className="analysis-tool-box-desc">{tool.desc}</span>
+            </button>
+          );
+        }) : (
           <p className="analysis-no-results">Ingen verktøy matcher søket ditt.</p>
         )}
       </div>

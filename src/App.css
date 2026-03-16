@@ -1,10 +1,12 @@
 :root {
   --primary-color:    #26BE76;
   --secondary-color:  #1E9D63;
+  --analysis-box:     #13af66;
   --bg:               #202020;
   --soft-bg:          rgba(255, 255, 255, 0.08);
   --text:             #1a1a1a;
   --text-mute:        rgba(255, 255, 255, 0.65);
+  --soft-text:        rgb(72, 72, 72);
   --hover-text:       #fff;
   --icon:             #1a1a1a;
   --text-input-area:  #ffffff;
@@ -23,6 +25,7 @@
   --soft-bg:          rgba(204, 204, 204, 0.803);
   --text:             #fff;
   --text-mute:        rgba(94, 94, 94, 0.9);
+  --soft-text:        rgb(202, 202, 202);
   --hover-text:       #1a1a1a;
   --icon:             #f1f1f1;
   --border:           rgba(99, 99, 99, 0.316);
@@ -961,6 +964,7 @@
   padding: 16px;
   border-radius: 13px;
   border: 1.5px solid transparent;
+  background: var(--analysis-box);
   cursor: pointer;
   text-align: left;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
@@ -988,18 +992,26 @@
 
 .analysis-tool-box-name {
   display: block;
+  position: absolute;
+  top: 13px;
+  left: 14px;
+  max-width: calc(100% - 56px);
   font-size: 1.5rem;
   font-weight: 700;
   color: #fff;
-  margin-bottom: 5px;
-  line-height: 2.5;
+  margin: 0;
+  line-height: 1.2;
 }
 
 .analysis-tool-box-desc {
   display: block;
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  right: 16px;
   font-size: 1srem;
   color: rgba(255, 255, 255, 0.72);
-  line-height: 1.9;
+  line-height: 1.3;
 }
 
 .analysis-no-results {
@@ -1008,27 +1020,6 @@
   color: var(--text-mute);
   padding: 2.5rem 1rem;
   font-size: 0.88rem;
-}
-
-/* Tool box color variants */
-.tool-green {
-  background:#26BE76;
-  border-color: rgba(38, 190, 118, 0.35);
-}
-
-.tool-blue {
-  background: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.35);
-}
-
-.tool-purple {
-  background: #5b21b6;
-  border-color: rgba(124, 58, 237, 0.35);
-}
-
-.tool-amber {
-  background: #D97706;
-  border-color: rgba(217, 119, 6, 0.35);
 }
 
 /* Kartlag Panel */
