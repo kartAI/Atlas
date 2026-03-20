@@ -26,11 +26,12 @@ const EXPORT_ACTIONS = {
     },
 }
 
-export function ExportPanel({ drawnLayers = [] }) {
+export function ExportPanel({ drawnLayers = [], layers = [] }) {
     const exportableLayers = drawnLayers.filter(layer => layer?.geoJson)
     const [selectedIds, setSelectedIds] = useState([])
     const [isExporting, setIsExporting] = useState(false)
     const [statusMessage, setStatusMessage] = useState('')
+    const activeBaseLayer = layers.find(l => l?.visible)
 
     useEffect(() => {
         const exportableIds = drawnLayers
@@ -77,6 +78,7 @@ export function ExportPanel({ drawnLayers = [] }) {
             await Promise.resolve(
                 action.run(selectedLayers, {
                     filenamePrefix: 'kartlag-eksport',
+                    basemapUrl: activeBaseLayer?.url || null,
                 })
             )
             setStatusMessage(`${action.label}-eksport startet.`)

@@ -1125,12 +1125,11 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: var(--soft-bg);
 }
 
 [data-theme="light"] .export-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.5));
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .export-title {
@@ -1165,24 +1164,28 @@
 
 .export-toolbar-btn,
 .export-format-btn {
-  border: 1px solid var(--border);
+  border: 1px solid var(--primary-color);
   border-radius: 10px;
-  color: var(--hover-text);
+  color: #fff;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  background: var(--primary-color);
+  transition: filter 0.2s, opacity 0.2s;
+}
+
+.export-toolbar-btn:hover,
+.export-format-btn:hover {
+  filter: brightness(1.15);
 }
 
 .export-toolbar-btn {
-  background: var(--soft-bg);
   padding: 8px 12px;
   font-size: 0.82rem;
 }
 
-.export-toolbar-btn:hover:not(:disabled),
-.export-format-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(38, 190, 118, 0.45);
-  color: var(--hover-text);
+.export-toolbar-btn:disabled,
+.export-format-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .export-summary {
@@ -1262,16 +1265,8 @@
 
 .export-format-btn {
   padding: 12px 14px;
-  background: linear-gradient(180deg, rgba(38, 190, 118, 0.18), rgba(38, 190, 118, 0.08));
   font-size: 0.9rem;
   font-weight: 600;
-}
-
-.export-toolbar-btn:disabled,
-.export-format-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  transform: none;
 }
 
 .export-status {

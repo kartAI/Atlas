@@ -52,7 +52,21 @@
             const t = setTimeout(() => {
                 const bounds = L.geoJSON(layer.geoJson).getBounds();
                 if (bounds.isValid()) {
-                    map.flyToBounds(bounds, { padding: [25, 25], maxZoom: 10 });
+                    const ne = bounds.getNorthEast();
+                    const sw = bounds.getSouthWest();
+                    const spanLng = Math.abs(ne.lng - sw.lng);
+                    const spanLat = Math.abs(ne.lat - sw.lat);
+                    const span = Math.max(spanLng, spanLat);
+
+                    // Smaller features → higher maxZoom for tighter framing
+                    let maxZoom;
+                    if (span < 0.005) maxZoom = 18;
+                    else if (span < 0.05) maxZoom = 17;
+                    else if (span < 0.5) maxZoom = 15;
+                    else if (span < 2) maxZoom = 13;
+                    else maxZoom = 11;
+
+                    map.flyToBounds(bounds, { padding: [60, 60], maxZoom });
                 }
                 handleFlyDone();
             }, 50);

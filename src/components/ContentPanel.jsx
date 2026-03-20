@@ -10,7 +10,7 @@ const PANEL_COMPONENTS = {
     'Eksporter': ExportPanel,
 };
 
-export function ContentPanel({ activePanel, onClose, drawnLayers, onSetDrawnLayerVisible, onRemoveDrawnLayer, onFlyToLayer }) {
+export function ContentPanel({ activePanel, onClose, layers, drawnLayers, onSetDrawnLayerVisible, onRemoveDrawnLayer, onFlyToLayer }) {
     const isOpen = !!activePanel;
     const Component = PANEL_COMPONENTS[activePanel] || (() => <h2>{activePanel}</h2>);
 
@@ -19,6 +19,7 @@ export function ContentPanel({ activePanel, onClose, drawnLayers, onSetDrawnLaye
             <button className="close-btn" onClick={onClose}>✕</button>
             {isOpen && (
                 <Component
+                    layers={layers}
                     drawnLayers={drawnLayers}
                     onSetDrawnLayerVisible={onSetDrawnLayerVisible}
                     onRemoveDrawnLayer={onRemoveDrawnLayer}
