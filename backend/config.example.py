@@ -17,6 +17,8 @@ MODEL_NAME = os.getenv("MODEL_NAME", "your-model-name-here")
 
 # Session management configuration
 SESSION_TIMEOUT_MINUTES = int(os.getenv("SESSION_TIMEOUT_MINUTES", "15"))
+MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "100"))
+MAX_HISTORY_PER_SESSION = int(os.getenv("MAX_HISTORY_PER_SESSION", "200"))
 DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("1", "true", "yes", "on")
 
 # Buffer search hardening
