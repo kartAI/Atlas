@@ -65,6 +65,16 @@ function App() {
   }
   ]);
 
+  const [drawnLayers, setDrawnLayers] = useState([]);
+
+  const addDrawnLayer = (info) => setDrawnLayers(prev => [...prev, info]);
+
+  const setDrawnLayerVisible = (id, visible) =>
+    setDrawnLayers(prev => prev.map(l => l.id === id ? { ...l, visible } : l));
+
+  const removeDrawnLayer = (id) =>
+    setDrawnLayers(prev => prev.filter(l => l.id !== id));
+
   const toggleLayer = (layerId) => {
     setLayers(prev => prev.map(layer => ({
       ...layer,
@@ -75,6 +85,8 @@ function App() {
   const handleSelect = (id) => {
     setActivePanel(activePanel === id ? null : id);
   };
+
+  const [flyTarget, setFlyTarget] = useState(null);
 
   return (
     <>
@@ -91,10 +103,22 @@ function App() {
           activePanel={activePanel} 
           onClose={() => setActivePanel(null)}
           layers={layers}
-          onToggleLayer={toggleLayer} />
+          onToggleLayer={toggleLayer}
+          drawnLayers={drawnLayers}
+          onSetDrawnLayerVisible={setDrawnLayerVisible}
+          onRemoveDrawnLayer={removeDrawnLayer}
+          onFlyToLayer={setFlyTarget} />
 
         <main className="map-stage">
-          <Map layers={layers} onToggleLayer={toggleLayer} />
+          <Map
+            layers={layers}
+            onToggleLayer={toggleLayer}
+            drawnLayers={drawnLayers}
+            onLayerCreated={addDrawnLayer}
+            onLayerRemoved={removeDrawnLayer}
+            flyTarget={flyTarget}
+            onFlyDone={() => setFlyTarget(null)}
+          />
         </main>
       </div>
     </>

@@ -25,9 +25,9 @@ BUFFER_DISTANCE_MAX_METERS = int(os.getenv("BUFFER_DISTANCE_MAX_METERS", "50000"
 BUFFER_RESULT_LIMIT = int(os.getenv("BUFFER_RESULT_LIMIT", "200"))
 
 # System prompt configuration - define the behavior of the AI assistant
-SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", """
+SYSTEM_PROMPT = """
 Your system prompt here.
-""".strip())
+""".strip()
 
 # Azure Blob Storage configuration
 AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING")

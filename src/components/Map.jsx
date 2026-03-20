@@ -1,25 +1,86 @@
-    import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, Marker, Popup } from "react-leaflet";
+    import { useEffect } from "react";
+    import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap } from "react-leaflet";
     import { BaseMapSwitcher } from "./MapLayers";
+    import L from "leaflet";
+    import { DrawToolBar } from "./DrawToolBar";
 
-    const NORWAY_BOUNDS = [
-        [57.0, 3.0],   // southwest corner 
-        [72.0, 32.0]   // northeast corner
-    ];
+    const NORWAY_BOUNDS = L.latLngBounds([55.0, 2.0], [73.0, 34.0]);
 
-    function Map({ layers, onToggleLayer }) {
-        const center = [58.1467, 7.9956];
+    // Pads maxBounds dynamically so zoomed-in panning is never restricted
+    function DynamicBounds() {
+        const map = useMap();
+
+        useEffect(() => {
+            function updateBounds() {
+                const pad = Math.max(0, map.getZoom() - 5) * 5;
+                map.setMaxBounds(NORWAY_BOUNDS.pad(pad));
+            }
+
+            updateBounds();
+            map.on('zoomend', updateBounds);
+            return () => map.off('zoomend', updateBounds);
+        }, [map]);
+
+        return null;
+    }
+
+    // Tells Leaflet to recalculate its size whenever the map container resizes
+    function MapResizeObserver() {
+        const map = useMap();
+
+        useEffect(() => {
+            const container = map.getContainer();
+            const observer = new ResizeObserver(() => {
+                map.invalidateSize();
+            });
+            observer.observe(container);
+            return () => observer.disconnect();
+        }, [map]);
+
+        return null;
+    }
+
+    function FlyToController({ drawnLayers, flyTarget, onFlyDone }) {
+        const map = useMap();
+
+        useEffect(() => {
+            if (!flyTarget) return;
+            const layer = drawnLayers.find(l => l.id === flyTarget);
+            if (!layer?.geoJson) return;
+
+            const t = setTimeout(() => {
+                const bounds = L.geoJSON(layer.geoJson).getBounds();
+                if (bounds.isValid()) {
+                    map.flyToBounds(bounds, { padding: [25, 25], maxZoom: 10 });
+                }
+                onFlyDone();
+            }, 50);
+            return () => clearTimeout(t);
+        }, [flyTarget]);
+
+        return null;
+    }
+
+    function Map({ layers, onToggleLayer, drawnLayers, onLayerCreated, onLayerRemoved, flyTarget, onFlyDone }) {
+        const center = [65.0, 15.0];
 
         return (
             <div className="map-root">
                 <MapContainer
-                    center={[65.0, 15.0]}
+                    center={center}
                     zoom={5}
-                    maxBounds={NORWAY_BOUNDS}   
-                    maxBoundsViscosity={1.0}
+                    maxBounds={NORWAY_BOUNDS}
+                    maxBoundsViscosity={0.5}
                     minZoom={4}
                     style={{ height: "100%", width: "100%" }}
-                    
                 >
+                    <DynamicBounds />
+                    <MapResizeObserver />
+                    <DrawToolBar
+                        drawnLayers={drawnLayers}
+                        onLayerCreated={onLayerCreated}
+                        onLayerRemoved={onLayerRemoved}
+                    />
                     {layers
                     .filter(layer => layer.visible)
                     .map(layer => {
@@ -35,9 +96,12 @@
                         return null;
                         })
                     }
-                    <Marker position={center}>
-                        <Popup>Test</Popup>
-                    </Marker>
+
+                    <FlyToController
+                        drawnLayers={drawnLayers}
+                        flyTarget={flyTarget}
+                        onFlyDone={onFlyDone}
+                    />
                 </MapContainer>
 
                 <BaseMapSwitcher layers={layers} onToggleLayer={onToggleLayer} />
