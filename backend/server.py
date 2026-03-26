@@ -29,12 +29,13 @@ from starlette.responses import JSONResponse
 from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT, list_documents
 from copilot import CopilotClient
 from session_manager import SessionManager
-from db import connect_db, disconnect_db, query
+from db import init_db_pool, close_pool, query
 
 # Import the three MCP ASGI apps
 from mcp_servers.db_server import db_app
 from mcp_servers.geo_server import geo_app
 from mcp_servers.docs_server import docs_app
+from mcp_servers.vector_server import vector_app
 
 # Copilot client and session manager initialization.
 client = CopilotClient()
@@ -48,11 +49,15 @@ async def lifespan(app):
     async with db_app.lifespan(app):
         async with geo_app.lifespan(app):
             async with docs_app.lifespan(app):
-                await client.start()
-                await connect_db()
-                yield
-                await client.stop()
-                await disconnect_db()
+                async with vector_app.lifespan(app):
+                    await init_db_pool()
+                    await client.start()
+                    manager.start_cleanup_loop()
+                    yield
+                    manager.stop_cleanup_loop()
+                    await client.stop()
+                    await close_pool()
+
 
 # REST endpoint handlers
 async def chat(request: Request):
@@ -61,7 +66,10 @@ async def chat(request: Request):
     if not message:
         return JSONResponse({"error": "'message' is required."}, status_code=400)
     session_id = data.get("session_id")
-    session_id, session = await manager.get_or_create(session_id)
+    try:
+        session_id, session = await manager.get_or_create(session_id)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=503)
     reply = await manager.send_message(session_id, message)
     return JSONResponse({"reply": reply, "session_id": session_id})
 
@@ -92,6 +100,7 @@ app = Starlette(
         Mount("/mcp/db",   app=db_app),
         Mount("/mcp/geo",  app=geo_app),
         Mount("/mcp/docs", app=docs_app),
+        Mount("/mcp/vector", app=vector_app), 
 
         # Existing REST API
         Route("/api/chat",                  endpoint=chat,          methods=["POST"]),
