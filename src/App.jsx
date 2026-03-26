@@ -67,7 +67,19 @@ function App() {
 
   const [drawnLayers, setDrawnLayers] = useState([]);
 
-  const addDrawnLayer = (info) => setDrawnLayers(prev => [...prev, info]);
+  const upsertDrawnLayer = (info) => {
+    setDrawnLayers(previousLayers => {
+      const hasExistingLayer = previousLayers.some(layer => layer.id === info.id);
+
+      if (!hasExistingLayer) {
+        return [...previousLayers, info];
+      }
+
+      return previousLayers.map(layer =>
+        layer.id === info.id ? { ...layer, ...info } : layer
+      );
+    });
+  };
 
   const setDrawnLayerVisible = (id, visible) =>
     setDrawnLayers(prev => prev.map(l => l.id === id ? { ...l, visible } : l));
@@ -114,7 +126,8 @@ function App() {
             layers={layers}
             onToggleLayer={toggleLayer}
             drawnLayers={drawnLayers}
-            onLayerCreated={addDrawnLayer}
+            onLayerCreated={upsertDrawnLayer}
+            onLayerUpdated={upsertDrawnLayer}
             onLayerRemoved={removeDrawnLayer}
             flyTarget={flyTarget}
             onFlyDone={() => setFlyTarget(null)}

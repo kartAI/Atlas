@@ -3,6 +3,7 @@ import { useMap } from "react-leaflet";
 import L from "leaflet";
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import '@geoman-io/leaflet-geoman-free';
+import { serializeLeafletLayer } from '../utils/leafletSerializer';
 
 const SHAPE_LABELS = {
     Marker: 'Markør',
@@ -12,18 +13,23 @@ const SHAPE_LABELS = {
     Circle: 'Sirkel',
 };
 
-export function DrawToolBar({ drawnLayers = [], onLayerCreated, onLayerRemoved }) {
+export function DrawToolBar({ drawnLayers = [], onLayerCreated, onLayerUpdated, onLayerRemoved }) {
     const map = useMap();
     const locationMarkerRef = useRef(null);
     const locateButtonRef = useRef(null);
     const layerMapRef = useRef(new Map()); // id -> leaflet layer
     const counterRef = useRef(1);
     const onLayerCreatedRef = useRef(onLayerCreated);
+    const onLayerUpdatedRef = useRef(onLayerUpdated);
     const onLayerRemovedRef = useRef(onLayerRemoved);
 
     useEffect(() => {
         onLayerCreatedRef.current = onLayerCreated;
     }, [onLayerCreated]);
+
+    useEffect(() => {
+        onLayerUpdatedRef.current = onLayerUpdated;
+    }, [onLayerUpdated]);
 
     useEffect(() => {
         onLayerRemovedRef.current = onLayerRemoved;
@@ -134,13 +140,47 @@ export function DrawToolBar({ drawnLayers = [], onLayerCreated, onLayerRemoved }
         }
         document.addEventListener('keydown', onKeyDown);
 
+        function emitLayerUpdate(layer) {
+            if (!layer?._gmDrawnId) return;
+
+            const geoJson = serializeLeafletLayer(layer);
+
+            if (!geoJson) return;
+
+            onLayerUpdatedRef.current?.({
+                id: layer._gmDrawnId,
+                name: layer._gmDrawnName ?? 'Tegning',
+                shape: layer._gmDrawnShape ?? layer.pm?.getShape?.() ?? 'Tegning',
+                geoJson,
+            });
+        }
+
+        function syncLayerChanges(event) {
+            const candidates = [];
+
+            if (event?.layer) candidates.push(event.layer);
+            if (event?.layers?.eachLayer) {
+                event.layers.eachLayer(layer => candidates.push(layer));
+            }
+
+            [...new Set(candidates)]
+                .filter(Boolean)
+                .forEach(emitLayerUpdate);
+        }
+
         function onLayerCreate({ layer }) {
             const shape = layer.pm?.getShape?.() ?? 'Tegning';
             const id = `drawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             const name = `${SHAPE_LABELS[shape] ?? shape} ${counterRef.current++}`;
+            const geoJson = serializeLeafletLayer(layer);
+
+            if (!geoJson) return;
+
             layer._gmDrawnId = id;
+            layer._gmDrawnName = name;
+            layer._gmDrawnShape = shape;
             layerMapRef.current.set(id, layer);
-            onLayerCreatedRef.current?.({ id, name, shape, visible: true, geoJson: layer.toGeoJSON() });
+            onLayerCreatedRef.current?.({ id, name, shape, visible: true, geoJson });
         }
         map.on('pm:create', onLayerCreate);
 
@@ -150,6 +190,10 @@ export function DrawToolBar({ drawnLayers = [], onLayerCreated, onLayerRemoved }
             onLayerRemovedRef.current?.(layer._gmDrawnId);
         }
         map.on('pm:remove', onLayerRemove);
+        map.on('pm:edit', syncLayerChanges);
+        map.on('pm:update', syncLayerChanges);
+        map.on('pm:change', syncLayerChanges);
+        map.on('pm:dragend', syncLayerChanges);
 
         function onLocationFound(e) {
             if (locationMarkerRef.current) locationMarkerRef.current.remove();
@@ -174,6 +218,10 @@ export function DrawToolBar({ drawnLayers = [], onLayerCreated, onLayerRemoved }
             map.off('pm:globaldrawmodetoggled', onDrawModeToggle);
             map.off('pm:create', onLayerCreate);
             map.off('pm:remove', onLayerRemove);
+            map.off('pm:edit', syncLayerChanges);
+            map.off('pm:update', syncLayerChanges);
+            map.off('pm:change', syncLayerChanges);
+            map.off('pm:dragend', syncLayerChanges);
             map.off('locationfound', onLocationFound);
             map.off('locationerror', onLocationError);
             document.removeEventListener('keydown', onKeyDown);

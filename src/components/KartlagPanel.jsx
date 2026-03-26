@@ -1,57 +1,20 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faEyeSlash, faTrash, faDownload } from '@fortawesome/free-solid-svg-icons';
+import { downloadLayersAsGeoJSON, sanitizeFilenameSegment } from '../utils/exportUtils';
 
 export function KartlagPanel({ drawnLayers = [], onSetDrawnLayerVisible, onRemoveDrawnLayer, onFlyToLayer }) {
-    function toFeatureCollection(layer) {
-        return {
-            ...layer.geoJson,
-            properties: { ...layer.geoJson.properties, name: layer.name }
-        };
-    }
-
-    function downloadGeoJson(data, filename) {
-        const blob = new Blob(
-            [JSON.stringify(data, null, 2)],
-            { type: 'application/json' }
-        );
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    function getLayerFilename(name) {
-        const sanitizedName = name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '') || 'tegning';
-
-        return `${sanitizedName}.geojson`;
-    }
-
     function handleLayerExport(layer) {
         if (!layer.geoJson) return;
 
-        downloadGeoJson(
-            {
-                type: 'FeatureCollection',
-                features: [toFeatureCollection(layer)]
-            },
-            getLayerFilename(layer.name)
-        );
+        downloadLayersAsGeoJSON([layer], {
+            filename: `${sanitizeFilenameSegment(layer.name, 'tegning')}.geojson`,
+        });
     }
 
     function handleExport() {
-        const featureCollection = {
-            type: 'FeatureCollection',
-            features: drawnLayers
-                .filter(l => l.geoJson)
-                .map(toFeatureCollection)
-        };
-
-        downloadGeoJson(featureCollection, 'tegninger.geojson');
+        downloadLayersAsGeoJSON(drawnLayers, {
+            filename: 'tegninger.geojson',
+        });
     }
 
     if (drawnLayers.length === 0) {
