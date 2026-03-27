@@ -117,7 +117,6 @@ export function Analysis() {
                   className={`analysis-filter-option${activeFilters.has(opt) ? ' active' : ''}`}
                   onClick={() => toggleFilter(opt)}
                 >
-                  <span className="analysis-filter-check">{activeFilters.has(opt) ? '✓' : ''}</span>
                   {opt}
                 </button>
               ))}
@@ -127,7 +126,6 @@ export function Analysis() {
                 className={`analysis-filter-option${sortAlpha ? ' active' : ''}`}
                 onClick={() => setSortAlpha(o => !o)}
               >
-                <span className="analysis-filter-check">{sortAlpha ? '✓' : ''}</span>
                 A–Å
               </button>
               {(activeFilters.size > 0 || sortAlpha) && (
