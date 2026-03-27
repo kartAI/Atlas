@@ -3,17 +3,17 @@ const EXPORT_LOGICAL_WIDTH = 1600
 const EXPORT_LOGICAL_HEIGHT = 1000
 const EXPORT_WIDTH = EXPORT_LOGICAL_WIDTH * EXPORT_SCALE
 const EXPORT_HEIGHT = EXPORT_LOGICAL_HEIGHT * EXPORT_SCALE
-const SMALL_FEATURE_MARKER_COLOR = '#d42020'
 const EXPORT_COLORS = [
-    '#12725a',
-    '#2787c7',
-    '#c05c2b',
-    '#7a43b6',
-    '#cf3b63',
-    '#0f766e',
-    '#a16207',
-    '#2563eb',
+    '#00e5ff',
+    '#ff3d71',
+    '#39ff14',
+    '#ffab00',
+    '#d500f9',
+    '#00e676',
+    '#ff6d00',
+    '#536dfe',
 ]
+const MIN_FEATURE_PIXELS = 20
 
 // ── Filename helpers ──
 
@@ -397,19 +397,13 @@ function drawExportPanels(ctx) {
     ctx.lineWidth = 1
 
     ctx.beginPath()
-    ctx.roundRect(62, 194, 978, 704, 28)
-    ctx.fill()
-    ctx.stroke()
-
-    ctx.beginPath()
-    ctx.roundRect(1082, 194, 456, 704, 28)
+    ctx.roundRect(330, 194, 940, 704, 28)
     ctx.fill()
     ctx.stroke()
 
     ctx.fillStyle = '#17352d'
     ctx.font = '700 26px "Segoe UI", Arial, sans-serif'
-    ctx.fillText('Kartskisse', 96, 246)
-    ctx.fillText('Valgte lag', 1112, 246)
+    ctx.fillText('Kartskisse', 364, 246)
 }
 
 function drawExportGrid(ctx, frame) {
@@ -439,7 +433,7 @@ function drawExportGrid(ctx, frame) {
     ctx.stroke()
 }
 
-const MIN_FEATURE_PIXELS = 20
+const LABEL_COLOR_BOX = 20
 
 function getFeaturePixelExtent(feature, projector) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -459,8 +453,6 @@ function getFeaturePixelExtent(feature, projector) {
     if (count === 0) return null
 
     return {
-        width: maxX - minX,
-        height: maxY - minY,
         size: Math.max(maxX - minX, maxY - minY),
         cx: cx / count,
         cy: cy / count,
@@ -470,14 +462,12 @@ function getFeaturePixelExtent(feature, projector) {
 function drawFeatureMarker(ctx, cx, cy, color) {
     ctx.save()
 
-    // Outer halo
     ctx.fillStyle = color
     ctx.globalAlpha = 0.22
     ctx.beginPath()
     ctx.arc(cx, cy, 20, 0, Math.PI * 2)
     ctx.fill()
 
-    // Colored ring
     ctx.globalAlpha = 0.9
     ctx.strokeStyle = color
     ctx.lineWidth = 3
@@ -485,20 +475,147 @@ function drawFeatureMarker(ctx, cx, cy, color) {
     ctx.arc(cx, cy, 10, 0, Math.PI * 2)
     ctx.stroke()
 
-    // Filled center
     ctx.globalAlpha = 1
     ctx.fillStyle = color
     ctx.beginPath()
     ctx.arc(cx, cy, 6, 0, Math.PI * 2)
     ctx.fill()
 
-    // White dot
     ctx.fillStyle = '#ffffff'
     ctx.beginPath()
     ctx.arc(cx, cy, 2.5, 0, Math.PI * 2)
     ctx.fill()
 
     ctx.restore()
+}
+
+function getLayerCentroid(layer, projector) {
+    const features = getLayerFeatures(layer)
+    let cx = 0, cy = 0, count = 0
+    features.forEach(f => {
+        forEachCoordinate(f.geometry, coord => {
+            const pt = projector.project(coord)
+            cx += pt.x
+            cy += pt.y
+            count++
+        })
+    })
+    if (count === 0) return null
+    return { x: cx / count, y: cy / count }
+}
+
+function distributeLabelsY(entries, plotFrame) {
+    if (!entries.length) return entries
+
+    const topY = 234
+    const bottomY = plotFrame.y + plotFrame.height - 20
+    const count = entries.length
+
+    entries.sort((a, b) => a.centroid.y - b.centroid.y)
+
+    if (count === 1) {
+        return entries.map(e => ({ ...e, labelY: topY + (bottomY - topY) / 2 }))
+    }
+
+    return entries.map((entry, i) => ({
+        ...entry,
+        labelY: topY + (i / (count - 1)) * (bottomY - topY),
+    }))
+}
+
+function drawLeaderLabels(ctx, layers, colorByLayer, projector, plotFrame) {
+    const mapCenterX = plotFrame.x + plotFrame.width / 2
+    const leftLabelX = 40
+    const rightLabelX = 1560
+    const leftLabels = []
+    const rightLabels = []
+
+    layers.forEach(layer => {
+        const centroid = getLayerCentroid(layer, projector)
+        if (!centroid) return
+        const color = colorByLayer.get(layer.id)
+        const features = getLayerFeatures(layer)
+        const entry = { layer, color, centroid, features }
+        if (centroid.x < mapCenterX) leftLabels.push(entry)
+        else rightLabels.push(entry)
+    })
+
+    const placedLeft = distributeLabelsY(leftLabels, plotFrame)
+    const placedRight = distributeLabelsY(rightLabels, plotFrame)
+
+    ctx.font = '600 18px "Segoe UI", Arial, sans-serif'
+
+    placedLeft.forEach(entry => {
+        const y = entry.labelY
+        const textY = y + 12
+
+        ctx.fillStyle = entry.color
+        ctx.beginPath()
+        ctx.roundRect(leftLabelX, y, LABEL_COLOR_BOX, LABEL_COLOR_BOX, 4)
+        ctx.fill()
+
+        ctx.fillStyle = '#17352d'
+        const name = entry.layer.name || 'Lag'
+        const label = name.length > 22 ? name.slice(0, 20) + '\u2026' : name
+        const textLeft = leftLabelX + LABEL_COLOR_BOX + 8
+        ctx.fillText(label, textLeft, textY)
+        const textWidth = ctx.measureText(label).width
+
+        const underlineY = textY + 5
+        ctx.save()
+        ctx.strokeStyle = '#17352d'
+        ctx.lineWidth = 1.5
+        ctx.globalAlpha = 0.5
+        ctx.beginPath()
+        ctx.moveTo(textLeft, underlineY)
+        ctx.lineTo(textLeft + textWidth, underlineY)
+        ctx.lineTo(entry.centroid.x, entry.centroid.y)
+        ctx.stroke()
+
+        ctx.fillStyle = '#17352d'
+        ctx.beginPath()
+        ctx.arc(entry.centroid.x, entry.centroid.y, 4, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+    })
+
+    placedRight.forEach(entry => {
+        const y = entry.labelY
+        const textY = y + 12
+
+        ctx.font = '600 18px "Segoe UI", Arial, sans-serif'
+        const name = entry.layer.name || 'Lag'
+        const label = name.length > 22 ? name.slice(0, 20) + '\u2026' : name
+        const textWidth = ctx.measureText(label).width
+
+        const boxX = rightLabelX - LABEL_COLOR_BOX
+        ctx.fillStyle = entry.color
+        ctx.beginPath()
+        ctx.roundRect(boxX, y, LABEL_COLOR_BOX, LABEL_COLOR_BOX, 4)
+        ctx.fill()
+
+        const textRight = boxX - 8
+        const textLeft = textRight - textWidth
+        ctx.fillStyle = '#17352d'
+        ctx.fillText(label, textLeft, textY)
+
+        const underlineY = textY + 5
+        ctx.save()
+        ctx.strokeStyle = '#17352d'
+        ctx.lineWidth = 1.5
+        ctx.globalAlpha = 0.5
+        ctx.beginPath()
+        ctx.moveTo(textRight, underlineY)
+        ctx.lineTo(textLeft, underlineY)
+        ctx.lineTo(entry.centroid.x, entry.centroid.y)
+        ctx.stroke()
+
+        ctx.fillStyle = '#17352d'
+        ctx.beginPath()
+        ctx.arc(entry.centroid.x, entry.centroid.y, 4, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+    })
 }
 
 function drawCanvasGeometry(ctx, geometry, color, projector) {
@@ -585,38 +702,6 @@ function drawCanvasGeometry(ctx, geometry, color, projector) {
     }
 }
 
-function drawExportLegend(ctx, layers, colorByLayer) {
-    const maxVisibleItems = 9
-    const visibleLayers = layers.slice(0, maxVisibleItems)
-    const hiddenCount = Math.max(layers.length - visibleLayers.length, 0)
-
-    visibleLayers.forEach((layer, index) => {
-        const y = 260 + index * 68
-        const color = colorByLayer.get(layer.id)
-        const features = getLayerFeatures(layer)
-
-        ctx.fillStyle = color
-        ctx.beginPath()
-        ctx.roundRect(1112, y, 24, 24, 8)
-        ctx.fill()
-
-        ctx.fillStyle = '#17352d'
-        ctx.font = '700 20px "Segoe UI", Arial, sans-serif'
-        ctx.fillText(layer.name || 'Lag', 1152, y + 18)
-
-        ctx.fillStyle = '#49645d'
-        ctx.font = '16px "Segoe UI", Arial, sans-serif'
-        const featureLabel = features.length === 1 ? 'geometri' : 'geometrier'
-        ctx.fillText(`${features.length} ${featureLabel}`, 1152, y + 44)
-    })
-
-    if (hiddenCount > 0) {
-        const y = 260 + maxVisibleItems * 68
-        ctx.fillStyle = '#49645d'
-        ctx.font = '18px "Segoe UI", Arial, sans-serif'
-        ctx.fillText(`+ ${hiddenCount} flere lag`, 1112, y + 18)
-    }
-}
 
 function drawExportFooter(ctx) {
     ctx.fillStyle = '#49645d'
@@ -644,7 +729,7 @@ async function createExportCanvas(layers, basemapUrl) {
     if (!ctx) throw new Error('Kunne ikke opprette canvas-kontekst.')
     ctx.scale(EXPORT_SCALE, EXPORT_SCALE)
 
-    const plotFrame = { x: 86, y: 214, width: 930, height: 660 }
+    const plotFrame = { x: 354, y: 214, width: 892, height: 660 }
     const bounds = getGeometryBounds(features)
     const projector = createMercatorProjector(bounds, plotFrame)
     const colorByLayer = new Map(
@@ -684,18 +769,14 @@ async function createExportCanvas(layers, basemapUrl) {
     features.forEach(feature => {
         const color = colorByLayer.get(feature.properties?.exportLayerId) || EXPORT_COLORS[0]
         const extent = getFeaturePixelExtent(feature, projector)
-
-        // Always draw the actual geometry
         drawCanvasGeometry(ctx, feature.geometry, color, projector)
-
-        // Overlay a prominent marker when the feature is too small to see clearly
         if (extent && extent.size < MIN_FEATURE_PIXELS) {
-            drawFeatureMarker(ctx, extent.cx, extent.cy, SMALL_FEATURE_MARKER_COLOR)
+            drawFeatureMarker(ctx, extent.cx, extent.cy, color)
         }
     })
     ctx.restore()
 
-    drawExportLegend(ctx, exportableLayers, colorByLayer)
+    drawLeaderLabels(ctx, exportableLayers, colorByLayer, projector, plotFrame)
     drawExportFooter(ctx)
 
     return canvas
