@@ -3,6 +3,7 @@ const EXPORT_LOGICAL_WIDTH = 1600
 const EXPORT_LOGICAL_HEIGHT = 1000
 const EXPORT_WIDTH = EXPORT_LOGICAL_WIDTH * EXPORT_SCALE
 const EXPORT_HEIGHT = EXPORT_LOGICAL_HEIGHT * EXPORT_SCALE
+const SMALL_FEATURE_MARKER_COLOR = '#d42020'
 const EXPORT_COLORS = [
     '#12725a',
     '#2787c7',
@@ -689,7 +690,7 @@ async function createExportCanvas(layers, basemapUrl) {
 
         // Overlay a prominent marker when the feature is too small to see clearly
         if (extent && extent.size < MIN_FEATURE_PIXELS) {
-            drawFeatureMarker(ctx, extent.cx, extent.cy, color)
+            drawFeatureMarker(ctx, extent.cx, extent.cy, SMALL_FEATURE_MARKER_COLOR)
         }
     })
     ctx.restore()
