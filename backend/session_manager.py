@@ -1,13 +1,11 @@
 import asyncio
 import logging
 import os
-import uuid
 from datetime import datetime, timedelta, timezone
 
 from copilot import CopilotClient, PermissionHandler
 from config import (
     DEMO_MODE,
-    MAX_HISTORY_PER_SESSION,
     MAX_SESSIONS,
     MODEL_NAME,
     SESSION_TIMEOUT_MINUTES,
@@ -18,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 SERVER_BASE_URL = os.getenv("SERVER_BASE_URL", "http://localhost:8000")
 
+# Maximum number of prior messages injected as context when resuming a chat.
+_MAX_CONTEXT_MESSAGES = 30
+# Maximum characters per message used in the context injection.
+_MAX_CONTEXT_CHARS = 1000
 
 def strict_permission_handler(*_args, **_kwargs):
     """Deny tool permission requests by default outside demo mode."""
@@ -29,14 +31,20 @@ def allow_all_permission_handler(*_args, **_kwargs):
 
 
 class SessionManager:
+    """
+    Maps DB chat IDs to live Copilot SDK sessions.
+
+    History is now stored in PostgreSQL (app.messages); this class keeps only
+    the in-memory Copilot sessions and their last-active timestamps.
+    """
+
     def __init__(self, client: CopilotClient, timeout_minutes=SESSION_TIMEOUT_MINUTES):
         self.client = client
-        self.sessions = {}
-        self.last_active = {}
-        self.history = {}
+        # sessions: chat_id (str) -> Copilot session object
+        self.sessions: dict = {}
+        self.last_active: dict = {}
         self.timeout = timedelta(minutes=timeout_minutes)
         self.max_sessions = MAX_SESSIONS
-        self.max_history = MAX_HISTORY_PER_SESSION
         self._cleanup_task = None
 
         if not SERVER_BASE_URL.startswith("https://") and "localhost" not in SERVER_BASE_URL:
@@ -60,46 +68,52 @@ class SessionManager:
             self._cleanup_task.cancel()
             logger.info("Session cleanup loop stopped")
 
-    async def get_or_create(self, session_id=None):
-        if session_id and session_id in self.sessions:
-            self.last_active[session_id] = datetime.now(timezone.utc)
-            return session_id, self.sessions[session_id]
+    async def get_or_create_for_chat(
+        self,
+        chat_id: str,
+        prior_messages: list | None = None,
+    ):
+        """
+        Return (or create) the live Copilot session for *chat_id*.
+
+        When no live session exists (new chat or server restart), a new
+        Copilot session is created.  If *prior_messages* is provided the
+        last _MAX_CONTEXT_MESSAGES entries are injected into the system
+        message so the model has continuity when resuming a conversation.
+
+        Raises RuntimeError if the session cap is reached.
+        """
+        if chat_id in self.sessions:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
+            return self.sessions[chat_id]
 
         if len(self.sessions) >= self.max_sessions:
             raise RuntimeError(
                 f"Maximum number of concurrent sessions ({self.max_sessions}) reached"
             )
 
-        session_id = str(uuid.uuid4())
-
-        sdk_approve_all_handler = getattr(PermissionHandler, "approve_all", None)
-        sdk_reject_all_handler = getattr(PermissionHandler, "reject_all", None)
+        sdk_approve_all = getattr(PermissionHandler, "approve_all", None)
+        sdk_reject_all = getattr(PermissionHandler, "reject_all", None)
         if DEMO_MODE:
             permission_handler = (
-                sdk_approve_all_handler
-                if callable(sdk_approve_all_handler)
-                else allow_all_permission_handler
+                sdk_approve_all if callable(sdk_approve_all) else allow_all_permission_handler
             )
         else:
             permission_handler = (
-                sdk_reject_all_handler
-                if callable(sdk_reject_all_handler)
-                else strict_permission_handler
+                sdk_reject_all if callable(sdk_reject_all) else strict_permission_handler
             )
+
+        system_content = SYSTEM_PROMPT
+        if prior_messages:
+            system_content = SYSTEM_PROMPT + self._build_history_context(prior_messages)
 
         session = await self.client.create_session({
             "model": MODEL_NAME,
             "system_message": {
                 "mode": "append",
-                "content": SYSTEM_PROMPT
+                "content": system_content,
             },
-
-            # The orchestrator (Copilot) can now pick from three specialised servers:
-            #   - db:          raw SQL tools for exploring and querying the database
-            #   - geo_server:  domain-specific geo/KU tools (buffer search, kommuner etc.)
-            #   - docs_server: Azure Blob document tools (list + fetch PDFs)
-            #   - vector_server: Vector-based spatial analysis tools (buffer, intersection)
-            # Add new MCP servers here as you build them.
+            # MCP servers the orchestrator can invoke.
             "mcp_servers": {
                 "database": {
                     "type": "http",
@@ -125,45 +139,63 @@ class SessionManager:
             "on_permission_request": permission_handler,
         })
 
-        self.sessions[session_id] = session
-        self.last_active[session_id] = datetime.now(timezone.utc)
-        self.history[session_id] = []
-        logger.info("Session created: %s (active=%d)", session_id, len(self.sessions))
-        return session_id, session
+        self.sessions[chat_id] = session
+        self.last_active[chat_id] = datetime.now(timezone.utc)
+        logger.info(
+            "Copilot session created for chat %s (active=%d)", chat_id, len(self.sessions)
+        )
+        return session
 
-    async def send_message(self, session_id, message):
-        session = self.sessions.get(session_id)
-        if session is None:
-            raise ValueError(f"Session {session_id} not found or expired")
+    def _build_history_context(self, messages: list) -> str:
+        """
+        Build a readable history block from *messages* to append to the system
+        prompt so the model can resume a conversation with context.
 
-        self.last_active[session_id] = datetime.now(timezone.utc)
+        Only the last _MAX_CONTEXT_MESSAGES are used; each message is truncated
+        to _MAX_CONTEXT_CHARS characters to keep the prompt within limits.
+        """
+        recent = messages[-_MAX_CONTEXT_MESSAGES:]
+        SEP = "─" * 80
+        lines = [
+            f"\n\n{SEP}\n"
+            "SAMTALEHISTORIKK (tidligere meldinger i denne samtalen)\n"
+            f"{SEP}"
+        ]
+        for msg in recent:
+            role_label = "Bruker" if msg.get("role") == "user" else "Assistent"
+            content = (msg.get("content") or "")[:_MAX_CONTEXT_CHARS]
+            if len(msg.get("content") or "") > _MAX_CONTEXT_CHARS:
+                content += "…"
+            lines.append(f"\n{role_label}: {content}")
+        lines.append(
+            f"\n{SEP}\n"
+            "Fortsett samtalen fra der den slapp av."
+        )
+        return "".join(lines)
 
+    async def send_message(self, session, message: str) -> str:
+        """
+        Send *message* to an active Copilot *session* and return the reply text.
+
+        Callers are responsible for persisting messages to the database.
+        """
         response = await session.send_and_wait({"prompt": message}, timeout=180)
-        content = response.data.content
-
-        self.history[session_id].append({"role": "user", "content": message})
-        self.history[session_id].append({"role": "assistant", "content": content})
-
-        if len(self.history[session_id]) > self.max_history:
-            self.history[session_id] = self.history[session_id][-self.max_history:]
-
-        return content
+        return response.data.content
 
     async def cleanup_expired(self):
         now = datetime.now(timezone.utc)
         expired = [
-            sid for sid, last in self.last_active.items()
+            chat_id
+            for chat_id, last in self.last_active.items()
             if now - last > self.timeout
         ]
-        for sid in expired:
+        for chat_id in expired:
             try:
-                await self.sessions[sid].destroy()
+                await self.sessions[chat_id].destroy()
             except Exception:
-                logger.warning("Failed to destroy session %s", sid, exc_info=True)
-            del self.sessions[sid]
-            del self.last_active[sid]
-            del self.history[sid]
-            logger.info("Session expired and removed: %s", sid)
-
-    def get_history(self, session_id):
-        return list(self.history.get(session_id, []))
+                logger.warning(
+                    "Failed to destroy session for chat %s", chat_id, exc_info=True
+                )
+            del self.sessions[chat_id]
+            del self.last_active[chat_id]
+            logger.info("Session expired and removed for chat: %s", chat_id)
