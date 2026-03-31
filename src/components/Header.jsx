@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
-import { LogOut } from 'lucide-react';
+import { LogOut, LogIn } from 'lucide-react';
 import { ConfirmDialog } from './ConfirmDialog';
 
-export function Header({ theme, onToggleTheme, user, onLogout }) {
+export function Header({ theme, onToggleTheme, user, onLogout, onLogin }) {
     const [showConfirm, setShowConfirm] = useState(false);
 
     return (
@@ -14,11 +14,7 @@ export function Header({ theme, onToggleTheme, user, onLogout }) {
             </div>
 
             <div className="header-right">
-                <button className="theme-toggle" onClick={onToggleTheme}>
-                    <FontAwesomeIcon icon={theme === 'dark' ? faSun : faMoon} />
-                </button>
-
-                {user && (
+                {user ? (
                     <button
                         className="header-logout-btn"
                         title={`Logg ut (${user.email})`}
@@ -27,7 +23,20 @@ export function Header({ theme, onToggleTheme, user, onLogout }) {
                         <LogOut size={15} />
                         Logg ut
                     </button>
+                ) : (
+                    <button
+                        className="header-login-btn"
+                        title="Logg inn"
+                        onClick={onLogin}
+                    >
+                        <LogIn size={15} />
+                        Logg inn
+                    </button>
                 )}
+
+                <button className="theme-toggle" onClick={onToggleTheme}>
+                    <FontAwesomeIcon icon={theme === 'dark' ? faSun : faMoon} />
+                </button>
             </div>
 
             {showConfirm && (

@@ -111,9 +111,13 @@ function App() {
     setChatUser(null);
   }
 
+  function handleHeaderLogin() {
+    setActivePanel('Chatbot');
+  }
+
   return (
     <>
-      <Header theme={theme} onToggleTheme={toggleTheme} user={chatUser} onLogout={handleHeaderLogout} />
+      <Header theme={theme} onToggleTheme={toggleTheme} user={chatUser} onLogout={handleHeaderLogout} onLogin={handleHeaderLogin} />
       <div className="app-body">
         <Sidebar 
           items={menuItems} 

@@ -132,7 +132,7 @@ export function ChatHistory({ chats, activeChatId, onContinue, onDeleteMany }) {
         return (
           <div
             key={chat.id}
-            className={`history-item${isActive ? ' history-item--active' : ''}${isSelected ? ' history-item--selected' : ''}`}
+            className={`history-item${isActive ? ' history-item--active' : ''}${isExpanded ? ' history-item--expanded' : ''}${isSelected ? ' history-item--selected' : ''}`}
           >
             {/* Header row */}
             <div

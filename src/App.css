@@ -1554,6 +1554,7 @@
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   flex-shrink: 0;
+  padding-top: 10px;
 }
 
 .chat-tab {
@@ -1563,19 +1564,28 @@
   border: none;
   border-bottom: 2px solid transparent;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   color: var(--text-mute);
   transition: color 0.15s, border-color 0.15s;
 }
 
+[data-theme="light"] .chat-tab {
+  color: #444;
+}
+
 .chat-tab:hover {
-  color: var(--primary-color);
+  color: var(--secondary-color);
 }
 
 .chat-tab--active {
   color: var(--primary-color);
   border-bottom-color: var(--primary-color);
+}
+
+[data-theme="light"] .chat-tab--active {
+  color: var(--secondary-color);
+  border-bottom-color: var(--secondary-color);
 }
 
 .chat-tab-actions {
@@ -1653,7 +1663,19 @@
 }
 
 .history-item--active > .history-item-header {
-  background: var(--menu-active);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="light"] .history-item--active > .history-item-header {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.history-item--expanded > .history-item-header {
+  background: rgba(30, 157, 99, 0.12);
+}
+
+[data-theme="light"] .history-item--expanded > .history-item-header {
+  background: rgba(30, 157, 99, 0.1);
 }
 
 .history-item-header {
@@ -1666,7 +1688,11 @@
 }
 
 .history-item-header:hover {
-  background: var(--soft-bg);
+  background: rgba(30, 157, 99, 0.14);
+}
+
+[data-theme="light"] .history-item-header:hover {
+  background: rgba(30, 157, 99, 0.12);
 }
 
 .history-item-icon {
@@ -1677,10 +1703,16 @@
 .history-item-title {
   flex: 1;
   font-size: 0.83rem;
-  color: var(--text-mute);
+  color: var(--menus);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+[data-theme="light"] .history-item-title {
+  color: #444;
+  opacity: 1;
 }
 
 .history-item-chevron {
@@ -1797,6 +1829,27 @@
   border-color: rgba(239, 68, 68, 0.65);
 }
 
+.header-login-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(38, 190, 118, 0.1);
+  border: 1px solid rgba(38, 190, 118, 0.35);
+  border-radius: 8px;
+  color: var(--primary-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.header-login-btn:hover {
+  background: rgba(38, 190, 118, 0.2);
+  border-color: rgba(38, 190, 118, 0.6);
+}
+
 /* Confirmation dialog */
 
 .confirm-overlay {
@@ -1804,7 +1857,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1903,21 +1956,35 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 12px;
-  background: #ef4444;
-  color: #fff;
-  border: none;
+  padding: 5px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 7px;
-  font-size: 0.79rem;
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   margin-left: auto;
   flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
 
 .history-bulk-delete-btn:hover {
-  background: #dc2626;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #ef4444;
+}
+
+[data-theme="light"] .history-bulk-delete-btn {
+  background: rgba(239, 68, 68, 0.06);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="light"] .history-bulk-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(220, 38, 38, 0.5);
 }
 
 /* History item: selected highlight */
@@ -1926,48 +1993,78 @@
   background: rgba(38, 190, 118, 0.08);
 }
 
-/* Fortsett button - proper button layout */
+[data-theme="light"] .history-item--selected > .history-item-header {
+  background: rgba(38, 190, 118, 0.1);
+}
+
+/* Fortsett button */
 
 .history-item-btn--fortsett {
-  padding: 4px 10px;
-  background: var(--soft-bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--menus);
+  padding: 5px 14px;
+  background: rgba(38, 190, 118, 0.08);
+  border: 1px solid rgba(38, 190, 118, 0.25);
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary-color);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   flex-shrink: 0;
+  letter-spacing: 0.01em;
 }
 
 .history-item-btn--fortsett:hover {
-  background: var(--menu-active);
+  background: rgba(38, 190, 118, 0.18);
   border-color: var(--primary-color);
+  color: var(--secondary-color);
 }
 
-/* Ny samtale inline tab button */
+[data-theme="light"] .history-item-btn--fortsett {
+  background: rgba(30, 157, 99, 0.06);
+  border-color: rgba(30, 157, 99, 0.25);
+  color: var(--secondary-color);
+}
+
+[data-theme="light"] .history-item-btn--fortsett:hover {
+  background: rgba(30, 157, 99, 0.15);
+  border-color: var(--secondary-color);
+  color: #177a4e;
+}
+
+/* Ny samtale tab button */
 
 .chat-tab-new-btn {
-  width: 28px;
-  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.4rem 0.65rem;
+  margin-left: auto;
+  margin-right: 6px;
   border-radius: 7px;
   background: none;
   border: 1.5px solid var(--border);
   cursor: pointer;
   color: var(--text-mute);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   flex-shrink: 0;
   align-self: center;
-  margin: 0 2px;
 }
 
 .chat-tab-new-btn:hover {
   background: var(--soft-bg);
   color: var(--primary-color);
   border-color: var(--primary-color);
+}
+
+[data-theme="light"] .chat-tab-new-btn {
+  color: #555;
+}
+
+[data-theme="light"] .chat-tab-new-btn:hover {
+  color: var(--secondary-color);
+  border-color: var(--secondary-color);
 }

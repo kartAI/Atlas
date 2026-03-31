@@ -70,7 +70,9 @@ export function ChatInterface({ externalUser, onUserChange }) {
           return;
         }
         const data = await res.json();
-        setUser({ user_id: data.user_id, email: data.email });
+        const userData = { user_id: data.user_id, email: data.email };
+        setUser(userData);
+        onUserChange?.(userData);
 
         const savedChatId = getActiveChatId();
         if (savedChatId) {
@@ -306,17 +308,6 @@ export function ChatInterface({ externalUser, onUserChange }) {
           Samtale
         </button>
 
-        {user && (
-          <button
-            className="chat-tab-new-btn"
-            title="Ny samtale"
-            onClick={handleNewChat}
-            aria-label="Ny samtale"
-          >
-            <Plus size={16} />
-          </button>
-        )}
-
         <button
           className={`chat-tab${activeTab === 'history' ? ' chat-tab--active' : ''}`}
           onClick={() => {
@@ -326,6 +317,18 @@ export function ChatInterface({ externalUser, onUserChange }) {
         >
           Historikk
         </button>
+
+        {user && (
+          <button
+            className="chat-tab-new-btn"
+            title="Ny samtale"
+            onClick={handleNewChat}
+            aria-label="Ny samtale"
+          >
+            <Plus size={14} />
+            <span>Ny samtale</span>
+          </button>
+        )}
       </div>
 
       {/* Samtale tab */}
