@@ -62,3 +62,12 @@ async def query(sql, params=None):
             await cur.execute(sql, params)
             return await cur.fetchall()
 
+
+async def execute(sql: str, params=None) -> None:
+    """Execute a DML statement (INSERT, UPDATE, DELETE) that returns no rows."""
+    if _pool is None:
+        raise RuntimeError("pool is not initialized.")
+    async with _pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(sql, params)
+
