@@ -233,3 +233,16 @@ class SessionManager:
             del self.sessions[chat_id]
             del self.last_active[chat_id]
             logger.info("Session expired and removed for chat: %s", chat_id)
+
+    async def discard_chat(self, chat_id: str) -> None:
+        """Drop the live Copilot session for a chat so it can be rebuilt from DB state."""
+        session = self.sessions.pop(chat_id, None)
+        self.last_active.pop(chat_id, None)
+
+        if session is None:
+            return
+
+        try:
+            await session.destroy()
+        except Exception:
+            logger.warning("Failed to destroy discarded session for chat %s", chat_id, exc_info=True)

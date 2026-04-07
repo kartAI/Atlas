@@ -42,7 +42,7 @@ from starlette.responses import JSONResponse
 from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT, list_documents
 from copilot import CopilotClient
 from session_manager import SessionManager
-from db import init_db_pool, close_pool, execute, query
+from db import init_db_pool, close_pool, execute, execute_transaction, query
 from auth_routes import (
     get_user_from_request,
     login,
@@ -122,6 +122,7 @@ async def chat(request: Request):
     map_context = data.get("map_context")
 
     chat_id: str | None = data.get("chat_id")
+    created_chat = not chat_id
     user_id = str(user["id"])
 
     # Resolve / create the chat
@@ -176,22 +177,34 @@ async def chat(request: Request):
     reply = result["content"]
     map_actions = result["map_actions"]
 
-    # Persist messages  
+    # Persist the full exchange atomically so chat history never lands half-written.
     try:
-        await execute(
-            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-            (chat_id, "user", message),
-        )
-        await execute(
-            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-            (chat_id, "assistant", reply),
-        )
-        await execute(
-            "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-            (chat_id,),
-        )
+        await execute_transaction([
+            (
+                "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
+                (chat_id, "user", message),
+            ),
+            (
+                "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
+                (chat_id, "assistant", reply),
+            ),
+            (
+                "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (chat_id,),
+            ),
+        ])
     except Exception as exc:
         logger.error("Failed to persist messages for chat %s: %s", chat_id, exc)
+        await manager.discard_chat(chat_id)
+        if created_chat:
+            try:
+                await execute(
+                    "DELETE FROM app.chats WHERE id = %s AND user_id = %s",
+                    (chat_id, user_id),
+                )
+            except Exception:
+                logger.warning("Failed to clean up unsaved chat %s", chat_id, exc_info=True)
+        return JSONResponse({"error": "Could not save chat history. Please try again."}, status_code=500)
 
     return JSONResponse({"reply": reply, "chat_id": chat_id, "map_actions": map_actions})
 

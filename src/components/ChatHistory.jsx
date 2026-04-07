@@ -218,4 +218,3 @@ export function ChatHistory({ chats, activeChatId, onContinue, onDeleteMany }) {
     </div>
   );
 }
-

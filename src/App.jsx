@@ -4,7 +4,7 @@ import { Header } from './components/Header.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ContentPanel } from './components/ContentPanel.jsx';
 import Map from './components/Map.jsx';
-import { apiFetch, clearToken, clearActiveChatId } from './utils/auth';
+import { apiFetch, clearToken, clearActiveChatId, getToken } from './utils/auth';
 
 import { faLayerGroup, faChartLine, faFileExport } from '@fortawesome/free-solid-svg-icons';
 import { faMessage } from '@fortawesome/free-regular-svg-icons';
@@ -20,11 +20,35 @@ function App() {
   const [activePanel, setActivePanel] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] =useState(() => localStorage.getItem('theme') || 'dark');
+  const [chatUser, setChatUser] = useState(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    async function syncChatUser() {
+      if (!getToken()) return;
+
+      try {
+        const res = await apiFetch('/api/auth/me');
+        if (!res.ok) {
+          clearToken();
+          clearActiveChatId();
+          return;
+        }
+
+        const data = await res.json();
+        setChatUser({ user_id: data.user_id, email: data.email });
+      } catch {
+        clearToken();
+        clearActiveChatId();
+      }
+    }
+
+    syncChatUser();
+  }, []);
 
   const toggleTheme = () => setTheme(t=> t === 'dark' ? 'light' : 'dark');
 
@@ -101,11 +125,12 @@ function App() {
 
   const [flyTarget, setFlyTarget] = useState(null);
 
-  // Global user state (synced from ChatInterface via onUserChange)
-  const [chatUser, setChatUser] = useState(null);
-
   async function handleHeaderLogout() {
-    try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Best-effort logout; local credentials are still cleared below.
+    }
     clearToken();
     clearActiveChatId();
     setChatUser(null);

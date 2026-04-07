@@ -49,6 +49,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
       setChats([]);
       setChatsLoaded(false);
       setActiveTab('chat');
+      setInput('');
+      setAttachments([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalUser]);
@@ -76,8 +78,12 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
 
         const savedChatId = getActiveChatId();
         if (savedChatId) {
-          await loadChatMessages(savedChatId);
-          setActiveChatIdState(savedChatId);
+          const loaded = await loadChatMessages(savedChatId);
+          if (loaded) {
+            setActiveChatIdState(savedChatId);
+          } else {
+            clearActiveChatId();
+          }
         }
       } catch {
         clearToken();
@@ -116,7 +122,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   async function loadChatMessages(chatId) {
     try {
       const res = await apiFetch(`/api/chats/${chatId}/messages`);
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const data = await res.json();
       const loaded = (data.messages || []).map(m => ({
         role: m.role,
@@ -124,8 +130,10 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
         attachments: [],
       }));
       setMessages(loaded);
+      return true;
     } catch {
       // Silently ignore.
+      return false;
     }
   }
 
@@ -138,23 +146,6 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     onUserChange?.(userData);
   }
 
-  async function handleLogout() {
-    try {
-      await apiFetch('/api/auth/logout', { method: 'POST' });
-    } catch {
-      // Best-effort logout.
-    }
-    clearToken();
-    clearActiveChatId();
-    setUser(null);
-    setActiveChatIdState(null);
-    setMessages([]);
-    setChats([]);
-    setChatsLoaded(false);
-    setActiveTab('chat');
-    onUserChange?.(null);
-  }
-
   async function handleNewChat() {
     setActiveChatIdState(null);
     setActiveChatId(null);
@@ -165,38 +156,33 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   }
 
   async function handleContinueChat(chatId) {
-    await loadChatMessages(chatId);
+    const loaded = await loadChatMessages(chatId);
+    if (!loaded) return;
     setActiveChatIdState(chatId);
     setActiveChatId(chatId);
     setActiveTab('chat');
   }
 
-  async function handleDeleteChat(chatId) {
-    try {
-      const res = await apiFetch(`/api/chats/${chatId}`, { method: 'DELETE' });
-      if (!res.ok) return;
-    } catch {
-      return;
-    }
-    if (chatId === activeChatId) {
-      setActiveChatIdState(null);
-      setActiveChatId(null);
-      setMessages([]);
-    }
-    setChats(prev => prev.filter(c => c.id !== chatId));
-  }
-
   async function handleDeleteManyChats(chatIds) {
-    // Fire deletions in parallel; ignore individual failures gracefully.
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       chatIds.map(id => apiFetch(`/api/chats/${id}`, { method: 'DELETE' }))
     );
-    if (chatIds.includes(activeChatId)) {
+    const deletedIds = results.flatMap((result, index) => {
+      if (result.status === 'fulfilled' && result.value.ok) {
+        return chatIds[index];
+      }
+      return [];
+    });
+
+    if (deletedIds.includes(activeChatId)) {
       setActiveChatIdState(null);
       setActiveChatId(null);
       setMessages([]);
     }
-    setChats(prev => prev.filter(c => !chatIds.includes(c.id)));
+
+    if (deletedIds.length > 0) {
+      setChats(prev => prev.filter(c => !deletedIds.includes(c.id)));
+    }
   }
 
   // Send message
