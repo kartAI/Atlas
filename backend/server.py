@@ -36,7 +36,6 @@ from mcp_servers.db_server import db_app
 from mcp_servers.geo_server import geo_app
 from mcp_servers.docs_server import docs_app
 from mcp_servers.vector_server import vector_app
-from mcp_servers.search_server import search_app
 from mcp_servers.map_server import map_app
 
 # Copilot client and session manager initialization.
@@ -52,7 +51,7 @@ async def lifespan(app):
         async with geo_app.lifespan(app):
             async with docs_app.lifespan(app):
                 async with vector_app.lifespan(app):
-                    async with search_app.lifespan(app):
+                    async with map_app.lifespan(app):
                         await init_db_pool()
                         await client.start()
                         manager.start_cleanup_loop()
@@ -125,7 +124,7 @@ app = Starlette(
         Mount("/mcp/geo",  app=geo_app),
         Mount("/mcp/docs", app=docs_app),
         Mount("/mcp/vector", app=vector_app),
-        Mount("/mcp/search", app=search_app),
+        Mount("/mcp/map", app=map_app),
 
         # Existing REST API
         Route("/api/chat",                  endpoint=chat,          methods=["POST"]),
