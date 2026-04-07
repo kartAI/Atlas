@@ -135,16 +135,23 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[st
 
 
 # ---------------------------------------------------------------------------
-# Step 5: Generate embeddings (stub)
+# Step 5: Generate embeddings (stub — pgvector column is ready)
 # ---------------------------------------------------------------------------
 
-async def generate_embeddings(chunks: list[str]) -> None:
+async def generate_embeddings(chunks: list[str]) -> list[float] | None:
     """
-    Generate vector embeddings for text chunks.
-    Stub — pgvector not yet enabled in the database.
-    Replace with an actual embedding model call when ready.
+    Generate a single embedding vector for the full document text.
+
+    STUB — returns None until an embedding model/API is configured.
+    When activated, this should:
+      1. Concatenate chunks (or use the full content) into one string
+      2. Call the embedding model (e.g. OpenAI text-embedding-3-small)
+      3. Return a list of 1536 floats
+
+    The pgvector column (vector(1536)) and HNSW index are ready in the database.
+    See search_service.py _embed_text() for the matching query-side stub.
     """
-    logger.info("generate_embeddings: stub — %d chunks, returning None", len(chunks))
+    logger.info("generate_embeddings: stub — %d chunks, returning None (ingen modell konfigurert)", len(chunks))
     return None
 
 
@@ -158,34 +165,44 @@ async def save_indexed_document(
     content: str,
     last_modified: str,
     file_hash: str,
-    embeddings=None,
+    embeddings: list[float] | None = None,
 ) -> int:
     """
     Upsert the document into the database with status=ready.
+    Stores the embedding vector if provided (otherwise NULL).
     Returns the document id.
     """
     t0 = time.perf_counter()
+
+    # Convert embedding list to pgvector string format: "[0.1,0.2,...]"
+    emb_str = str(embeddings) if embeddings else None
+
     rows = await query(
         """
         INSERT INTO documents
-            (title, content, source_blob, last_modified, file_hash, indexing_status, indexed_at)
+            (title, content, source_blob, last_modified, file_hash,
+             embedding, indexing_status, indexed_at)
         VALUES
-            (%(title)s, %(content)s, %(blob)s, %(lm)s, %(hash)s, 'ready', now())
+            (%(title)s, %(content)s, %(blob)s, %(lm)s, %(hash)s,
+             %(emb)s::vector, 'ready', now())
         ON CONFLICT (source_blob) DO UPDATE SET
             title           = EXCLUDED.title,
             content         = EXCLUDED.content,
             last_modified   = EXCLUDED.last_modified,
             file_hash       = EXCLUDED.file_hash,
+            embedding       = EXCLUDED.embedding,
             indexing_status = 'ready',
             indexed_at      = now(),
             error_message   = NULL
         RETURNING id;
         """,
-        {"title": title, "content": content, "blob": blob_name, "lm": last_modified, "hash": file_hash},
+        {"title": title, "content": content, "blob": blob_name,
+         "lm": last_modified, "hash": file_hash, "emb": emb_str},
     )
     elapsed = time.perf_counter() - t0
     doc_id = rows[0]["id"] if rows else None
-    logger.info("save_indexed_document: '%s' → id=%s (%.2fs)", blob_name, doc_id, elapsed)
+    logger.info("save_indexed_document: '%s' → id=%s, embedding=%s (%.2fs)",
+                blob_name, doc_id, "yes" if embeddings else "no", elapsed)
     return doc_id
 
 

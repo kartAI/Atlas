@@ -1,8 +1,12 @@
 -- schema.sql — canonical documents table definition
 --
 -- This is the single source of truth for a fresh database setup.
--- It replaces migrations 001–005, which were applied incrementally during development.
+-- It replaces migrations 001–006, which were applied incrementally during development.
 -- Run this file on a NEW database. On an existing database, use the numbered migrations.
+--
+-- Prerequisites (run once on the database):
+--   CREATE EXTENSION IF NOT EXISTS vector;
+--   CREATE EXTENSION IF NOT EXISTS pg_trgm;
 --
 -- Usage:
 --   psql $DATABASE_URL -f backend/migrations/schema.sql
@@ -19,8 +23,9 @@ CREATE TABLE IF NOT EXISTS documents (
     -- Full-text search vector (Norwegian), kept in sync by trigger below
     search_vector    TSVECTOR,
 
-    -- Placeholder for future semantic search (pgvector not yet enabled)
-    embedding        JSONB,
+    -- Semantic search embedding (pgvector). 1536 dims = OpenAI text-embedding-3-small.
+    -- Change dimension if using a different model.
+    embedding        vector(1536),
 
     -- Ingest pipeline tracking
     last_modified    TIMESTAMPTZ,                              -- blob last-modified from Azure
@@ -33,11 +38,22 @@ CREATE TABLE IF NOT EXISTS documents (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Fast full-text search lookups
+-- Full-text search: GIN index on tsvector
 CREATE INDEX IF NOT EXISTS idx_documents_search_vector
     ON documents USING GIN (search_vector);
 
--- Fast status filtering (e.g. find all documents needing processing)
+-- Fuzzy search: trigram GIN indexes on title and content (pg_trgm)
+CREATE INDEX IF NOT EXISTS idx_documents_title_trgm
+    ON documents USING GIN (title gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_documents_content_trgm
+    ON documents USING GIN (content gin_trgm_ops);
+
+-- Semantic search: HNSW index for cosine similarity (pgvector)
+CREATE INDEX IF NOT EXISTS idx_documents_embedding_hnsw
+    ON documents USING hnsw (embedding vector_cosine_ops);
+
+-- Status filtering (e.g. find all documents needing processing)
 CREATE INDEX IF NOT EXISTS idx_documents_indexing_status
     ON documents (indexing_status);
 
