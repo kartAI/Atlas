@@ -13,6 +13,7 @@ Tools:
 
 import json
 import logging
+import os
 
 from fastmcp import FastMCP
 from search_service import search_full_text, search_fuzzy, search_semantic, hybrid_search
@@ -22,6 +23,10 @@ from db import query as db_query
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP("search_server")
+
+# Indexing tools are disabled unless explicitly enabled via env var.
+# This prevents unintended writes and external API spend on unprotected deployments.
+_INDEXING_ENABLED = os.getenv("INDEXING_ENABLED", "").lower() in ("1", "true", "yes")
 
 
 @mcp.tool(annotations={"readOnlyHint": True})
@@ -134,6 +139,8 @@ async def index_document(blob_name: str, force: bool = False) -> str:
     """
     if not blob_name or not blob_name.strip():
         return json.dumps({"error": "Filnavn mangler."})
+    if not _INDEXING_ENABLED:
+        return json.dumps({"error": "Indeksering er ikke aktivert. Sett INDEXING_ENABLED=true i miljøvariabler."})
 
     try:
         # Discover metadata for this specific blob
@@ -165,6 +172,8 @@ async def index_all_documents(force: bool = False) -> str:
         force: Reindekser alt selv om filene er uendret.
     """
     try:
+        if not _INDEXING_ENABLED:
+            return json.dumps({"error": "Indeksering er ikke aktivert. Sett INDEXING_ENABLED=true i miljøvariabler."})
         result = await run_pipeline(force=force, retry_failed=True)
         return json.dumps(result, ensure_ascii=False)
     except Exception as e:

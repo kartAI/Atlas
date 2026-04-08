@@ -1,4 +1,9 @@
-"""Force-reindex all documents from Azure Blob Storage."""
+"""Force-reindex all documents from Azure Blob Storage.
+
+Usage:
+    cd backend
+    python run_reindex.py
+"""
 
 import asyncio
 import sys
@@ -17,7 +22,14 @@ async def main():
     await close_pool()
 
 
-if sys.platform == "win32":
-    asyncio.run(main(), loop_factory=asyncio.SelectorEventLoop)
-else:
-    asyncio.run(main())
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        # psycopg async requires SelectorEventLoop on Windows.
+        loop = asyncio.SelectorEventLoop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(main())
+        finally:
+            loop.close()
+    else:
+        asyncio.run(main())
