@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference/embeddings"
 GITHUB_MODELS_MODEL = "openai/text-embedding-3-small"
+GITHUB_API_VERSION = "2026-03-10"
 
 
 def _get_token() -> str:
@@ -48,6 +49,7 @@ def _call_embeddings_sync(texts: list[str]) -> list[list[float]]:
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
             "Content-Type": "application/json",
+            "X-GitHub-Api-Version": GITHUB_API_VERSION,
         },
         method="POST",
     )
@@ -58,6 +60,11 @@ def _call_embeddings_sync(texts: list[str]) -> list[list[float]]:
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8", errors="replace")
         logger.error("Embeddings API HTTP %d: %s", e.code, error_body)
+        if e.code == 403:
+            logger.error(
+                "HTTP 403 — check that your token has 'models:read' permission "
+                "and your GitHub account has access to GitHub Models."
+            )
         raise RuntimeError(f"Embeddings API returned HTTP {e.code}") from e
     except urllib.error.URLError as e:
         logger.error("Embeddings API connection error: %s", e.reason)
