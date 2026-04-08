@@ -6,7 +6,7 @@ Pipeline steps per document:
   2. should_reindex_document()  — skip if unchanged and already indexed
   3. extract_text()             — fetch PDF and extract text (blocking → thread)
   4. chunk_text()               — split into chunks (ready for embeddings later)
-  5. generate_embeddings()      — stub, pgvector not yet enabled
+  5. generate_embeddings()      — GitHub Models API (text-embedding-3-small)
   6. save_indexed_document()    — upsert into documents table, status=ready
   7. update_index_status()      — set status (used on failure)
 
@@ -135,24 +135,44 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[st
 
 
 # ---------------------------------------------------------------------------
-# Step 5: Generate embeddings (stub — pgvector column is ready)
+# Step 5: Generate embeddings (GitHub Models API)
 # ---------------------------------------------------------------------------
 
 async def generate_embeddings(chunks: list[str]) -> list[float] | None:
     """
-    Generate a single embedding vector for the full document text.
+    Generate a single embedding vector for the document.
 
-    STUB — returns None until an embedding model/API is configured.
-    When activated, this should:
-      1. Concatenate chunks (or use the full content) into one string
-      2. Call the embedding model (e.g. OpenAI text-embedding-3-small)
-      3. Return a list of 1536 floats
-
-    The pgvector column (vector(1536)) and HNSW index are ready in the database.
-    See search_service.py _embed_text() for the matching query-side stub.
+    Sends all chunks to the GitHub Models API (text-embedding-3-small),
+    then averages the returned vectors into one 1536-dim embedding.
+    Returns None if the token is not configured (safe fallback).
     """
-    logger.info("generate_embeddings: stub — %d chunks, returning None (ingen modell konfigurert)", len(chunks))
-    return None
+    if not chunks:
+        return None
+
+    try:
+        from embedding_client import get_embeddings
+        vectors = await get_embeddings(chunks)
+    except ValueError as e:
+        logger.warning("generate_embeddings: %s", e)
+        return None
+    except Exception as e:
+        logger.error("generate_embeddings: API call failed: %s", e)
+        return None
+
+    if not vectors:
+        return None
+
+    # Average all chunk embeddings into one document embedding
+    dims = len(vectors[0])
+    averaged = [0.0] * dims
+    for vec in vectors:
+        for i in range(dims):
+            averaged[i] += vec[i]
+    for i in range(dims):
+        averaged[i] /= len(vectors)
+
+    logger.info("generate_embeddings: %d chunks → 1 averaged vector (%d dims)", len(chunks), dims)
+    return averaged
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +281,7 @@ async def process_document(blob: dict, retry_failed: bool = True) -> dict:
         chunks = chunk_text(content)
         logger.info("chunk_text: '%s' → %d chunks (%.3fs)", blob_name, len(chunks), time.perf_counter() - t0)
 
-        # Step 5: embeddings (stub)
+        # Step 5: generate embeddings
         t0 = time.perf_counter()
         embeddings = await generate_embeddings(chunks)
         logger.info("generate_embeddings: '%s' → done (%.3fs)", blob_name, time.perf_counter() - t0)

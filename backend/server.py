@@ -234,10 +234,12 @@ async def test_search(request: Request):
     q = request.query_params.get("q", "")
     if not q:
         return JSONResponse({"error": "Bruk ?q=søkeord"}, status_code=400)
-    from search_service import search_full_text, search_fuzzy, hybrid_search
+    from search_service import search_full_text, search_fuzzy, search_semantic, hybrid_search
     mode = request.query_params.get("mode", "fulltext")
     if mode == "fuzzy":
         results = await search_fuzzy(q)
+    elif mode == "semantic":
+        results = await search_semantic(q)
     elif mode == "hybrid":
         results = await hybrid_search(q)
     else:

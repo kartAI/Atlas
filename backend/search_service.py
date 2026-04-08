@@ -15,11 +15,6 @@ from db import query
 
 logger = logging.getLogger(__name__)
 
-# Embedding dimension must match the model used in ingest_pipeline.py.
-# 1536 = OpenAI text-embedding-3-small / ada-002.
-EMBEDDING_DIMENSIONS = 1536
-
-
 async def search_full_text(search_query: str, limit: int = 10) -> list[dict]:
     """
     Norwegian full-text search using tsvector + plainto_tsquery.
@@ -165,29 +160,20 @@ async def hybrid_search(search_query: str, limit: int = 10) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Embedding helper (stub — replace when model is chosen)
+# Embedding helper
 # ---------------------------------------------------------------------------
 
 async def _embed_text(text: str) -> list[float] | None:
     """
-    Convert text to an embedding vector.
-
-    STUB — returns None until an embedding model/API is configured.
-
-    To activate semantic search, replace this with one of:
-      1. OpenAI:  openai.embeddings.create(model="text-embedding-3-small", input=text)
-      2. Local:   sentence_transformers.SentenceTransformer("all-MiniLM-L6-v2").encode(text)
-
-    The returned list must have exactly EMBEDDING_DIMENSIONS floats (currently 1536).
-    If using a different model, update EMBEDDING_DIMENSIONS and re-run migration 006.
+    Convert text to an embedding vector using GitHub Models API.
+    Returns None if the token is not configured (safe fallback).
     """
-    # TODO: Implement when embedding model is chosen.
-    #
-    # Example with OpenAI:
-    #   import openai
-    #   response = await openai.AsyncOpenAI().embeddings.create(
-    #       model="text-embedding-3-small", input=text
-    #   )
-    #   return response.data[0].embedding
-    #
-    return None
+    try:
+        from embedding_client import get_single_embedding
+        return await get_single_embedding(text)
+    except ValueError as e:
+        logger.warning("_embed_text: %s", e)
+        return None
+    except Exception as e:
+        logger.error("_embed_text: API call failed: %s", e)
+        return None

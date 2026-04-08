@@ -2,21 +2,22 @@
 MCP Server: Document Search
 
 Tools:
-  - search_documents:      Full-text search across documents (Norwegian tsvector).
-  - search_documents_fuzzy: Fuzzy search (ILIKE fallback until pg_trgm is enabled).
-  - search_hybrid:         Combined full-text + fuzzy search.
-  - index_document:        Index a single PDF from Azure Blob Storage (via pipeline).
-  - index_all_documents:   Index all PDFs from Azure Blob Storage (via pipeline).
-  - get_indexing_status:   Show indexing status counts per category.
+  - search_documents:         Full-text search across documents (Norwegian tsvector).
+  - search_documents_fuzzy:   Fuzzy search (pg_trgm trigram similarity).
+  - search_documents_semantic: Semantic search (pgvector cosine similarity).
+  - search_hybrid:            Combined full-text + semantic + fuzzy search.
+  - index_document:           Index a single PDF from Azure Blob Storage (via pipeline).
+  - index_all_documents:      Index all PDFs from Azure Blob Storage (via pipeline).
+  - get_indexing_status:       Show indexing status counts per category.
 """
 
 import json
 import logging
 
 from fastmcp import FastMCP
-from search_service import search_full_text, search_fuzzy, hybrid_search
+from search_service import search_full_text, search_fuzzy, search_semantic, hybrid_search
 from ingest_pipeline import process_document, run_pipeline, discover_documents
-from db import query
+from db import query as db_query
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ async def search_documents(query: str, limit: int = 10) -> str:
 @mcp.tool(annotations={"readOnlyHint": True})
 async def search_documents_fuzzy(query: str, limit: int = 10) -> str:
     """
-    Fuzzy-søk i dokumenter (ILIKE-basert fallback).
+    Fuzzy-søk i dokumenter (pg_trgm trigram-likhet).
     Brukes når fulltekstsøk ikke gir treff og du vil prøve bredere matching.
 
     Args:
@@ -72,9 +73,34 @@ async def search_documents_fuzzy(query: str, limit: int = 10) -> str:
 
 
 @mcp.tool(annotations={"readOnlyHint": True})
+async def search_documents_semantic(query: str, limit: int = 10) -> str:
+    """
+    Semantisk søk i dokumenter via pgvector (cosine similarity).
+    Bruker embedding-modellen til å finne dokumenter med lignende innhold,
+    selv om ordene ikke matcher direkte. Krever at GITHUB_MODELS_TOKEN er satt.
+
+    Args:
+        query: Søkeord eller frase, f.eks. 'miljøpåvirkning av veier'.
+        limit: Maks antall resultater (standard 10).
+    """
+    if not query or not query.strip():
+        return json.dumps({"error": "Søkeord mangler."})
+
+    try:
+        results = await search_semantic(query, limit)
+        return json.dumps({
+            "count": len(results),
+            "results": results,
+        }, ensure_ascii=False, default=str)
+    except Exception as e:
+        logger.exception("search_documents_semantic failed")
+        return json.dumps({"error": f"Semantisk søk feilet: {e}"})
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
 async def search_hybrid(query: str, limit: int = 10) -> str:
     """
-    Kombinert søk: fulltekst + fuzzy (semantisk søk legges til senere).
+    Kombinert søk: fulltekst + semantisk + fuzzy.
     Gir bredest mulig dekning ved å slå sammen resultater fra flere søkemetoder.
 
     Args:
@@ -155,7 +181,7 @@ async def get_indexing_status() -> str:
     """
     try:
         # Count only blob-sourced documents (source_blob IS NOT NULL)
-        rows = await query(
+        rows = await db_query(
             """
             SELECT indexing_status, COUNT(*) AS count
             FROM documents
@@ -169,7 +195,7 @@ async def get_indexing_status() -> str:
         total_blobs = sum(status_counts.values())
 
         # List failed documents with error messages
-        failed_rows = await query(
+        failed_rows = await db_query(
             "SELECT source_blob, error_message FROM documents WHERE indexing_status = 'failed' AND source_blob IS NOT NULL;",
             {},
         )
