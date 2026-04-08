@@ -126,12 +126,15 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[st
     if not text:
         return []
 
+    # Guard: if overlap >= chunk_size the step would be 0 or negative, causing an
+    # infinite loop.  Clamp to chunk_size - 1 so progress is always guaranteed.
+    step = max(chunk_size - overlap, 1)
     chunks = []
     start = 0
     while start < len(text):
         end = start + chunk_size
         chunks.append(text[start:end])
-        start += chunk_size - overlap
+        start += step
     return chunks
 
 
@@ -340,13 +343,14 @@ async def run_pipeline(force: bool = False, retry_failed: bool = True) -> dict:
         return {"status": "ok", "total": 0, "message": "No documents found in Blob Storage."}
 
     if force:
-        # Reset all to 'new' so every document gets reprocessed
-        for i, blob in enumerate(blobs):
-            await execute(
-                "UPDATE documents SET indexing_status = 'new' WHERE source_blob = %(b)s",
-                {"b": blob["name"]},
-            )
-            logger.info("run_pipeline: force-reset %d/%d — %s", i + 1, len(blobs), blob["name"])
+        # Reset all to 'new' so every document gets reprocessed.
+        # Single batch UPDATE avoids N sequential round-trips.
+        blob_names = [blob["name"] for blob in blobs]
+        await execute(
+            "UPDATE documents SET indexing_status = 'new' WHERE source_blob = ANY(%(blobs)s)",
+            {"blobs": blob_names},
+        )
+        logger.info("run_pipeline: force-reset %d documents", len(blob_names))
 
     # Process with bounded concurrency (avoids hammering DB and Blob Storage)
     semaphore = asyncio.Semaphore(_CONCURRENCY)

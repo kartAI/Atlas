@@ -156,7 +156,7 @@ async def hybrid_search(search_query: str, limit: int = 10) -> list[dict]:
     try:
         for doc in await search_fuzzy(search_query, limit):
             doc_id = doc["id"]
-            if doc_id not in combined:
+            if doc_id not in combined or doc["score"] > combined[doc_id]["score"]:
                 doc["source"] = "fuzzy"
                 combined[doc_id] = doc
     except Exception as e:

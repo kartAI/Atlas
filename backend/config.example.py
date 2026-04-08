@@ -42,6 +42,16 @@ BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME")
 #    container = blob_service.get_container_client(BLOB_CONTAINER_NAME)
 #    return [blob.name for blob in container.list_blobs() if blob.name.endswith(".pdf") or blob.name.endswith(".PDF")]
 
+# def list_documents_with_metadata():
+#    """Return PDF blobs with name, last_modified (datetime), and file_hash (etag)."""
+#    blob_service = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+#    container = blob_service.get_container_client(BLOB_CONTAINER_NAME)
+#    return [
+#        {"name": blob.name, "last_modified": blob.last_modified, "file_hash": blob.etag or ""}
+#        for blob in container.list_blobs()
+#        if blob.name.endswith(".pdf") or blob.name.endswith(".PDF")
+#    ]
+
 # def fetch_document(blob_name):
 #    blob_service = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 #    container = blob_service.get_container_client(BLOB_CONTAINER_NAME)
@@ -56,3 +66,7 @@ BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME")
 
 # POSTGRESQL DATABASE URL
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Search / indexing
+# INDEXING_ENABLED=true  — enable index_document and index_all_documents MCP tools
+# GITHUB_MODELS_TOKEN=ghp_...  — GitHub fine-grained token with 'models:read' scope (for semantic search)

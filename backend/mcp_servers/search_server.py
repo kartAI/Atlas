@@ -17,7 +17,7 @@ import os
 
 from fastmcp import FastMCP
 from search_service import search_full_text, search_fuzzy, search_semantic, hybrid_search
-from ingest_pipeline import process_document, run_pipeline, discover_documents
+from ingest_pipeline import process_document, run_pipeline, discover_documents, update_index_status
 from db import query as db_query
 
 logger = logging.getLogger(__name__)
@@ -150,8 +150,7 @@ async def index_document(blob_name: str, force: bool = False) -> str:
             return json.dumps({"error": f"Fant ikke '{blob_name}' i Blob Storage."})
 
         if force:
-            # Reset status so should_reindex returns True
-            from ingest_pipeline import update_index_status
+            # Reset status so the atomic claim in process_document will reprocess it.
             await update_index_status(blob["name"], "new")
 
         result = await process_document(blob, retry_failed=True)
