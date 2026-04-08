@@ -894,7 +894,7 @@ function createPdfDocument(jpegDataUrl, imageWidth, imageHeight, title) {
     pushText(`5 0 obj\n<< /Length ${encoder.encode(contentStream).length} >>\nstream\n${contentStream}endstream\nendobj\n`)
 
     offsets[6] = totalLength
-    pushText(`6 0 obj\n<< /Title (${escapePdfString(title)}) /Creator (GeoMCP SDK) /Producer (GeoMCP SDK) /CreationDate (D:${formatPdfDate()}) >>\nendobj\n`)
+    pushText(`6 0 obj\n<< /Title (${escapePdfString(title)}) /Creator (Atlas) /Producer (Atlas) /CreationDate (D:${formatPdfDate()}) >>\nendobj\n`)
 
     const xrefStart = totalLength
     pushText('xref\n0 7\n0000000000 65535 f \n')
