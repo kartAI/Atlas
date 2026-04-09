@@ -4,7 +4,8 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from copilot import CopilotClient, PermissionHandler, PermissionRequestResult
+from copilot import CopilotClient
+from copilot.session import PermissionHandler, PermissionRequestResult
 from mcp_servers.map_server import get_and_clear_shapes
 from config import (
     DEMO_MODE,
@@ -111,14 +112,14 @@ class SessionManager:
         if prior_messages:
             system_content = SYSTEM_PROMPT + self._build_history_context(prior_messages)
 
-        session = await self.client.create_session({
-            "model": MODEL_NAME,
-            "system_message": {
+        session = await self.client.create_session(
+            model=MODEL_NAME,
+            system_message={
                 "mode": "append",
                 "content": system_content,
             },
             # MCP servers the orchestrator can invoke.
-            "mcp_servers": {
+            mcp_servers={
                 "database": {
                     "type": "http",
                     "url": f"{SERVER_BASE_URL}/mcp/db/mcp",
@@ -150,8 +151,8 @@ class SessionManager:
                     "tools": ["*"],
                 },
             },
-            "on_permission_request": permission_handler,
-        })
+            on_permission_request=permission_handler,
+        )
 
         self.sessions[chat_id] = session
         self.last_active[chat_id] = datetime.now(timezone.utc)
@@ -206,7 +207,7 @@ class SessionManager:
             full_message = message
 
         try:
-            response = await session.send_and_wait({"prompt": full_message}, timeout=180)
+            response = await session.send_and_wait(full_message, timeout=180)
         except Exception:
             # Evict the broken session so the next request creates a fresh one
             # instead of retrying against a permanently dead session.
