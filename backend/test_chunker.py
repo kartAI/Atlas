@@ -240,7 +240,7 @@ def test_single_heading_no_body():
     chunks = chunk_document(blocks, document_name="OnlyHeading", source_blob="heading.pdf")
     # The document has only 1 named section — below MIN_HEADINGS_FOR_STRUCTURE=2,
     # so it falls back to paragraph-based chunking
-    return assert_true("single heading document produces chunks", len(chunks) >= 0)  # just no crash
+    return assert_true("single heading document produces at least one chunk", len(chunks) >= 1)
 
 
 def test_blocks_without_font_metadata():
@@ -253,7 +253,7 @@ def test_blocks_without_font_metadata():
     ]
     try:
         chunks = chunk_document(blocks, document_name="MinimalBlocks", source_blob="minimal.pdf")
-        return assert_true("no crash on minimal blocks", len(chunks) >= 0)
+        return assert_true("minimal blocks produce at least one chunk", len(chunks) >= 1)
     except Exception as e:
         print(f"  FAIL: unexpected exception: {e}")
         return False

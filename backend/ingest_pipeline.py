@@ -12,10 +12,11 @@ Pipeline steps per document:
 
 Status model (indexing_status):
   new        — not yet processed
-  processing — pipeline is actively working on this document
-  ready      — fully indexed: content + embeddings available
-  partial    — content indexed (full-text/fuzzy OK), but embeddings failed;
-               automatically retried on next pipeline run
+  processing — pipeline is actively working on this document;
+               stale rows (>30 min) are reclaimed at next pipeline start
+  ready      — fully indexed: content + ALL chunk embeddings available
+  partial    — content indexed (full-text/fuzzy OK), but some or all
+               embeddings failed; automatically retried on next pipeline run
   failed     — extraction or processing error
 
 Legacy functions kept for reference (no longer called in the main pipeline):
@@ -45,6 +46,10 @@ logger = logging.getLogger(__name__)
 
 # Max number of documents processed in parallel
 _CONCURRENCY = 3
+
+# Documents stuck in 'processing' longer than this are considered stale
+# (crashed/killed worker) and will be reclaimed on the next pipeline run.
+_STALE_PROCESSING_MINUTES = 30
 
 
 # ---------------------------------------------------------------------------
@@ -460,13 +465,15 @@ async def process_document(blob: dict, retry_failed: bool = True) -> dict:
     # Atomic claim: check eligibility and set status='processing' in one statement.
     # Returns a row only if the document should be (re)indexed, preventing race conditions
     # when multiple workers process the same document concurrently.
+    # Also sets updated_at so stale processing rows can be detected and reclaimed.
     claimed = await query(
         """
         INSERT INTO documents
             (title, content, source_blob, last_modified, file_hash, indexing_status)
         VALUES (%(blob)s, '', %(blob)s, %(lm)s, %(hash)s, 'processing')
         ON CONFLICT (source_blob) DO UPDATE
-            SET indexing_status = 'processing'
+            SET indexing_status = 'processing',
+                updated_at     = now()
         WHERE documents.indexing_status != 'processing'
           AND CASE documents.indexing_status
               WHEN 'ready' THEN
@@ -539,6 +546,7 @@ async def process_document(blob: dict, retry_failed: bool = True) -> dict:
         # Fallback: if no chunk embeddings were generated but we have content,
         # attempt a document-level embedding so semantic search can still find
         # this document via the documents.embedding fallback path.
+        all_chunks_embedded = (embedded_count == chunk_count and chunk_count > 0)
         has_any_embedding = embedded_count > 0
         if embedded_count == 0 and content.strip():
             logger.warning(
@@ -561,12 +569,20 @@ async def process_document(blob: dict, retry_failed: bool = True) -> dict:
                 )
 
         # Step 7: flip status.
-        # 'ready'   = fully indexed (content + embeddings available)
-        # 'partial' = content indexed for full-text/fuzzy, but no embeddings
-        #             → automatically retried on next pipeline run
-        if has_any_embedding:
+        # 'ready'   = fully indexed: content + ALL chunk embeddings available
+        # 'partial' = content indexed for full-text/fuzzy, but some or all
+        #             embeddings missing → automatically retried on next run
+        if all_chunks_embedded:
             await update_index_status(blob_name, "ready")
             return {"status": "ok", "blob": blob_name, "document_id": doc_id, "chunks": chunk_count}
+        elif has_any_embedding:
+            await update_index_status(blob_name, "partial")
+            logger.warning(
+                "process_document: '%s' set to 'partial' — %d/%d chunk embeddings succeeded; "
+                "retrying missing embeddings on next pipeline run",
+                blob_name, embedded_count, chunk_count,
+            )
+            return {"status": "partial", "blob": blob_name, "document_id": doc_id, "chunks": chunk_count}
         else:
             await update_index_status(blob_name, "partial")
             logger.warning(
@@ -597,6 +613,26 @@ async def run_pipeline(force: bool = False, retry_failed: bool = True) -> dict:
     Returns a summary dict with counts and timing.
     """
     t_total = time.perf_counter()
+
+    # Reclaim stale processing rows — documents stuck in 'processing' from a
+    # previous crashed or killed worker.  Reset them to 'new' so they are
+    # re-evaluated and re-indexed on this run.
+    stale = await query(
+        """
+        UPDATE documents
+        SET indexing_status = 'new',
+            error_message   = 'Reclaimed from stale processing state'
+        WHERE indexing_status = 'processing'
+          AND updated_at < now() - make_interval(mins => %(mins)s)
+        RETURNING source_blob;
+        """,
+        {"mins": _STALE_PROCESSING_MINUTES},
+    )
+    if stale:
+        logger.warning(
+            "run_pipeline: reclaimed %d stale processing document(s): %s",
+            len(stale), [r["source_blob"] for r in stale],
+        )
 
     # Step 1: discover
     blobs = await discover_documents()

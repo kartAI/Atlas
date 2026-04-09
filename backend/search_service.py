@@ -47,6 +47,7 @@ async def search_full_text(search_query: str, limit: int = 10) -> list[dict]:
             ts_rank(search_vector, plainto_tsquery('norwegian', %(q)s)) AS score
         FROM documents
         WHERE search_vector @@ plainto_tsquery('norwegian', %(q)s)
+          AND indexing_status IN ('ready', 'partial')
         ORDER BY score DESC
         LIMIT %(lim)s;
         """,
@@ -137,6 +138,7 @@ async def _search_semantic_chunks(
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             WHERE c.embedding IS NOT NULL
+              AND d.indexing_status IN ('ready', 'partial')
             ORDER BY d.id, c.embedding <=> %(emb)s::vector
         ) best_per_doc
         ORDER BY score DESC
@@ -167,6 +169,7 @@ async def _search_semantic_documents(
             1 - (embedding <=> %(emb)s::vector) AS score
         FROM documents
         WHERE embedding IS NOT NULL
+          AND indexing_status IN ('ready', 'partial')
         ORDER BY embedding <=> %(emb)s::vector
         LIMIT %(lim)s;
         """,
@@ -198,8 +201,9 @@ async def search_fuzzy(search_query: str, limit: int = 10) -> list[dict]:
                 word_similarity(%(q)s, content)
             ) AS score
         FROM documents
-        WHERE similarity(title, %(q)s) > 0.1
-           OR word_similarity(%(q)s, content) > 0.1
+        WHERE (similarity(title, %(q)s) > 0.1
+           OR word_similarity(%(q)s, content) > 0.1)
+          AND indexing_status IN ('ready', 'partial')
         ORDER BY score DESC
         LIMIT %(lim)s;
         """,

@@ -713,8 +713,11 @@ def _fallback_paragraph_chunks(
     chunks: list[dict] = []
 
     for i, group_text in enumerate(groups):
-        # Rough page estimate: proportional position in document
-        page_est = max(1, round((i / max(len(groups), 1)) * total_pages))
+        # Rough page estimate: spread chunks evenly from page 1 to total_pages
+        if len(groups) <= 1:
+            page_est = 1
+        else:
+            page_est = max(1, round(1 + i * (total_pages - 1) / (len(groups) - 1)))
         meta = _build_metadata(
             document_name  = document_name,
             source_blob    = source_blob,
