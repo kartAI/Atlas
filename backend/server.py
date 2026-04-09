@@ -3,10 +3,12 @@ Main Starlette application.
 
 Mounts MCP servers alongside the existing REST API:
 
-  /mcp/db/mcp      — Database tools  (list_tables, describe_table, query_database)
+  /mcp/db/mcp      — Database tools  (list_tables, describe_table, get_schema_overview, explain_query, query_database)
   /mcp/geo/mcp     — Geo tools       (list_kommuner, list_vernetyper, buffer_search)
   /mcp/docs/mcp    — Document tools  (list_documents, fetch_document)
-  /mcp/search/mcp  — Search tools    (search_documents, search_hybrid, index_*)
+  /mcp/vector/mcp  — Vector tools    (buffer, intersection, envelope, get_coordinates, point_in_polygon, get_verdensarv_sites)
+  /mcp/map/mcp     — Map tools       (draw_shape)
+  /mcp/search/mcp  — Search tools    (search_documents, search_documents_fuzzy, search_documents_semantic, search_hybrid, index_*, get_indexing_status)
 
 Auth endpoints:
   POST /api/auth/register
@@ -44,6 +46,7 @@ from starlette.responses import JSONResponse
 from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT, list_documents
 from copilot import CopilotClient
 from session_manager import SessionManager
+from usage_tracker import get_or_create_tracker, get_tracker
 from db import init_db_pool, close_pool, execute, execute_transaction, query
 from auth_routes import (
     get_user_from_request,
@@ -171,15 +174,26 @@ async def chat(request: Request):
     except RuntimeError as exc:
         return JSONResponse({"error": str(exc)}, status_code=503)
 
+    # Start usage tracking for this turn.
+    tracker = get_or_create_tracker(chat_id)
+    turn_id = f"{chat_id}-{len(prior_messages) // 2}"
+    tracker.start_turn(turn_id)
+
     # Send to Copilot
     try:
         result = await manager.send_message(copilot_session, message, map_context=map_context, chat_id=chat_id)
     except Exception as exc:
+        # Finalise the turn even on error so partial data isn't lost.
+        tracker.finalise_turn()
         logger.error("Copilot send_message failed for chat %s: %s", chat_id, exc)
         return JSONResponse({"error": "AI service error. Please try again."}, status_code=502)
 
     reply = result["content"]
     map_actions = result["map_actions"]
+
+    # Finalise usage tracking for this turn.
+    turn_usage = tracker.finalise_turn()
+    usage_snapshot = tracker.snapshot(turn_usage)
 
     # Persist the full exchange atomically so chat history never lands half-written.
     try:
@@ -210,7 +224,55 @@ async def chat(request: Request):
                 logger.warning("Failed to clean up unsaved chat %s", chat_id, exc_info=True)
         return JSONResponse({"error": "Could not save chat history. Please try again."}, status_code=500)
 
-    return JSONResponse({"reply": reply, "chat_id": chat_id, "map_actions": map_actions})
+    return JSONResponse({
+        "reply": reply,
+        "chat_id": chat_id,
+        "map_actions": map_actions,
+        "usage": usage_snapshot,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Usage query endpoint
+# ---------------------------------------------------------------------------
+
+async def get_usage(request: Request):
+    """
+    GET /api/usage?chat_id=<uuid>
+
+    Returns the current usage snapshot for a chat session.
+    If no chat_id is provided, returns an empty/unavailable snapshot.
+    """
+    user = await get_user_from_request(request)
+    if not user:
+        return JSONResponse({"error": "Not authenticated."}, status_code=401)
+
+    chat_id = request.query_params.get("chat_id")
+    if not chat_id:
+        return JSONResponse({"usage": {
+            "turn": None,
+            "session": None,
+            "monthly": {"confidence": "unavailable"},
+        }})
+
+    # Enforce ownership.
+    user_id = str(user["id"])
+    ownership = await query(
+        "SELECT id FROM app.chats WHERE id = %s AND user_id = %s",
+        (chat_id, user_id),
+    )
+    if not ownership:
+        return JSONResponse({"error": "Chat not found."}, status_code=404)
+
+    tracker = get_tracker(chat_id)
+    if not tracker:
+        return JSONResponse({"usage": {
+            "turn": None,
+            "session": None,
+            "monthly": {"confidence": "unavailable"},
+        }})
+
+    return JSONResponse({"usage": tracker.snapshot()})
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +350,9 @@ app = Starlette(
 
         # AI orchestration
         Route("/api/chat",      endpoint=chat,          methods=["POST"]),
+
+        # Usage tracking
+        Route("/api/usage",     endpoint=get_usage,     methods=["GET"]),
 
         # Miscellaneous
         Route("/api/documents", endpoint=get_documents, methods=["GET"]),

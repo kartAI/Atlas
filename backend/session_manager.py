@@ -3,10 +3,12 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Callable, cast
 
 from copilot import CopilotClient
 from copilot.session import PermissionHandler, PermissionRequestResult
 from mcp_servers.map_server import get_and_clear_shapes
+from usage_tracker import get_or_create_tracker, discard_tracker
 from config import (
     DEMO_MODE,
     MAX_SESSIONS,
@@ -51,6 +53,7 @@ class SessionManager:
         self.timeout = timedelta(minutes=timeout_minutes)
         self.max_sessions = MAX_SESSIONS
         self._cleanup_task = None
+        self._usage_unsubscribers: dict = {}
 
         if not SERVER_BASE_URL.startswith("https://") and "localhost" not in SERVER_BASE_URL:
             logger.warning(
@@ -100,12 +103,14 @@ class SessionManager:
         sdk_approve_all = getattr(PermissionHandler, "approve_all", None)
         sdk_reject_all = getattr(PermissionHandler, "reject_all", None)
         if DEMO_MODE:
-            permission_handler = (
-                sdk_approve_all if callable(sdk_approve_all) else allow_all_permission_handler
+            permission_handler = cast(
+                Callable[..., PermissionRequestResult],
+                sdk_approve_all if callable(sdk_approve_all) else allow_all_permission_handler,
             )
         else:
-            permission_handler = (
-                sdk_reject_all if callable(sdk_reject_all) else strict_permission_handler
+            permission_handler = cast(
+                Callable[..., PermissionRequestResult],
+                sdk_reject_all if callable(sdk_reject_all) else strict_permission_handler,
             )
 
         system_content = SYSTEM_PROMPT
@@ -156,6 +161,12 @@ class SessionManager:
 
         self.sessions[chat_id] = session
         self.last_active[chat_id] = datetime.now(timezone.utc)
+
+        # Register usage tracker event handler for this session.
+        tracker = get_or_create_tracker(chat_id)
+        unsubscribe = session.on(tracker.handle_event)
+        self._usage_unsubscribers[chat_id] = unsubscribe
+
         logger.info(
             "Copilot session created for chat %s (active=%d)", chat_id, len(self.sessions)
         )
@@ -207,13 +218,17 @@ class SessionManager:
             full_message = message
 
         try:
-            response = await session.send_and_wait(full_message, timeout=180)
+            response = await session.send_and_wait(full_message, timeout=900)
         except Exception:
             # Evict the broken session so the next request creates a fresh one
             # instead of retrying against a permanently dead session.
             if chat_id and chat_id in self.sessions:
                 self.sessions.pop(chat_id, None)
                 self.last_active.pop(chat_id, None)
+                unsub = self._usage_unsubscribers.pop(chat_id, None)
+                if unsub:
+                    unsub()
+                discard_tracker(chat_id)
                 logger.warning(
                     "Evicted broken session for chat %s; will recreate on next request",
                     chat_id,
@@ -238,6 +253,11 @@ class SessionManager:
                 logger.warning(
                     "Failed to destroy session for chat %s", chat_id, exc_info=True
                 )
+            # Unsubscribe usage tracker and discard it.
+            unsub = self._usage_unsubscribers.pop(chat_id, None)
+            if unsub:
+                unsub()
+            discard_tracker(chat_id)
             del self.sessions[chat_id]
             del self.last_active[chat_id]
             logger.info("Session expired and removed for chat: %s", chat_id)
@@ -246,6 +266,12 @@ class SessionManager:
         """Drop the live Copilot session for a chat so it can be rebuilt from DB state."""
         session = self.sessions.pop(chat_id, None)
         self.last_active.pop(chat_id, None)
+
+        # Clean up usage tracker subscription.
+        unsub = self._usage_unsubscribers.pop(chat_id, None)
+        if unsub:
+            unsub()
+        discard_tracker(chat_id)
 
         if session is None:
             return
