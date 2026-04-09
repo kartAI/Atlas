@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 
 import { AuthModal } from './AuthModal';
 import { ChatHistory } from './ChatHistory';
+import { TurnUsage, MonthlyUsageBar, InputAreaUsageBar } from './UsageDisplay';
 import {
   apiFetch,
   clearActiveChatId,
@@ -35,6 +36,10 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Usage tracking state
+  const [usageSession, setUsageSession] = useState(null);
+  const [usageMonthly, setUsageMonthly] = useState(null);
+
   // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,6 +56,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
       setActiveTab('chat');
       setInput('');
       setAttachments([]);
+      setUsageSession(null);
+      setUsageMonthly(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalUser]);
@@ -143,6 +150,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     setMessages([]);
     setChats([]);
     setChatsLoaded(false);
+    setUsageSession(null);
+    setUsageMonthly(null);
     onUserChange?.(userData);
   }
 
@@ -153,6 +162,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     setInput('');
     setAttachments([]);
     setActiveTab('chat');
+    setUsageSession(null);
+    setUsageMonthly(null);
   }
 
   async function handleContinueChat(chatId) {
@@ -161,6 +172,21 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     setActiveChatIdState(chatId);
     setActiveChatId(chatId);
     setActiveTab('chat');
+    // Fetch current usage for this chat if a tracker exists on the backend.
+    setUsageSession(null);
+    setUsageMonthly(null);
+    try {
+      const res = await apiFetch(`/api/usage?chat_id=${chatId}`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.usage) {
+          setUsageSession(d.usage.session || null);
+          setUsageMonthly(d.usage.monthly || null);
+        }
+      }
+    } catch {
+      // Non-critical; usage will repopulate on next message.
+    }
   }
 
   async function handleDeleteManyChats(chatIds) {
@@ -178,6 +204,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
       setActiveChatIdState(null);
       setActiveChatId(null);
       setMessages([]);
+      setUsageSession(null);
+      setUsageMonthly(null);
     }
 
     if (deletedIds.length > 0) {
@@ -240,9 +268,20 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
         setChatsLoaded(false); // Invalidate so history refreshes next open.
       }
 
+      // Update usage state from the response.
+      if (data.usage) {
+        setUsageSession(data.usage.session || null);
+        setUsageMonthly(data.usage.monthly || null);
+      }
+
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', text: data.reply, attachments: [] },
+        {
+          role: 'assistant',
+          text: data.reply,
+          attachments: [],
+          turnUsage: data.usage?.turn || null,
+        },
       ]);
     } catch {
       setMessages(prev => [
@@ -378,6 +417,9 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                           : msg.text}
                       </div>
                     )}
+                    {msg.role === 'assistant' && msg.turnUsage && (
+                      <TurnUsage usage={msg.turnUsage} />
+                    )}
                   </div>
                 );
               })
@@ -414,6 +456,9 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
               ))}
             </div>
           )}
+
+          {/* Unified session + monthly usage strip above input */}
+          <InputAreaUsageBar monthly={usageMonthly} session={usageSession} />
 
           <div className="chat-input-area">
             <div className="paperclip">
