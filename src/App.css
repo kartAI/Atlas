@@ -2068,3 +2068,286 @@
   color: var(--secondary-color);
   border-color: var(--secondary-color);
 }
+
+/* ==========================================================================
+   Usage Display Components
+   ========================================================================== */
+
+/* Turn Usage — compact expandable summary below assistant messages */
+.turn-usage {
+  max-width: 100%;
+  padding: 4px 12px;
+  margin-top: -2px;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0 0 12px 12px;
+}
+
+.turn-usage__summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.turn-usage__icon {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.turn-usage__cost {
+  font-weight: 600;
+}
+
+.turn-usage__tokens {
+  opacity: 0.8;
+}
+
+.turn-usage__model {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.turn-usage__details {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--soft-bg);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.turn-usage__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.turn-usage__row span:last-child {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Session Usage Footer */
+.session-usage-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.session-usage-footer__icon {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.session-usage-footer__sep {
+  opacity: 0.4;
+}
+
+/* Monthly Usage Bar */
+.monthly-usage-bar {
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  border-bottom: 1px solid var(--border);
+}
+
+.monthly-usage-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.monthly-usage-bar__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.monthly-usage-bar__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.monthly-usage-bar__toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  color: var(--text-mute);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.monthly-usage-bar__toggle:hover {
+  border-color: var(--primary-color);
+  color: var(--hover-text);
+}
+
+.monthly-usage-bar__track {
+  width: 100%;
+  height: 4px;
+  background: var(--soft-bg);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.monthly-usage-bar__fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.monthly-usage-bar__fill--overage {
+  background: #e74c3c;
+}
+
+.monthly-usage-bar__reset {
+  margin-top: 2px;
+  font-size: 0.65rem;
+  opacity: 0.6;
+  text-align: right;
+}
+
+/* ============================================================
+   Input-area usage bar — always visible directly above input
+   ============================================================ */
+
+.input-usage-bar {
+  position: relative;
+  border-top: 1px solid var(--border);
+  padding: 2px 12px 8px;
+  background: transparent;
+}
+
+.input-usage-bar--unavailable {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.input-usage-bar__track {
+  position: relative;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+/* Styles for "progress bar" based on usage
+.input-usage-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--primary-color);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+} 
+
+.input-usage-bar--overage .input-usage-bar__fill {
+  background: #e74c3c;
+}
+
+.input-usage-bar--unavailable .input-usage-bar__fill {
+  background: color-mix(in srgb, var(--text-primary) 25%, transparent);
+}
+*/
+
+.input-usage-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.input-usage-bar__session {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.65;
+}
+
+.input-usage-bar__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.input-usage-bar__monthly {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--text-primary);
+  opacity: 0.75;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: opacity 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.input-usage-bar__monthly:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--hover-text, var(--primary-color));
+}
+
+.input-usage-bar__monthly--unavailable,
+.input-usage-bar__monthly:disabled {
+  cursor: default;
+  opacity: 0.5;
+  color: var(--text-secondary);
+  font-weight: 400;
+  pointer-events: none;
+}
+
+.input-usage-bar__label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 500;
+  color: var(--text-primary);
+  opacity: 0.75;
+}
+
+.input-usage-bar--unavailable .input-usage-bar__label {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.input-usage-bar__est {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.62rem;
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.input-usage-bar__reset {
+  font-size: 0.63rem;
+  opacity: 0.5;
+  white-space: nowrap;
+}
