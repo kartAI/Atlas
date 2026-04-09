@@ -869,7 +869,7 @@
 .analysis-panel {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 75px - 40px);
+  height: calc(100vh - 75px - 40px);
   gap: 14px;
 }
 
@@ -1085,6 +1085,9 @@
   grid-template-columns: 1fr 1fr;
   gap: 13px;
   align-content: start;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .analysis-tool-box {
@@ -1151,6 +1154,90 @@
   color: var(--text-mute);
   padding: 2.5rem 1rem;
   font-size: 0.88rem;
+}
+
+/* Analysis tool box selected state */
+.analysis-tool-box.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.analysis-tool-box.selected .analysis-tool-box-icon {
+  opacity: 1;
+  color: #fff;
+}
+
+/* Floating action bar */
+.analysis-action-bar {
+  margin-top: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  gap: 10px;
+}
+
+.analysis-action-count {
+  font-size: 0.82rem;
+  color: var(--text-mute);
+  font-weight: 500;
+}
+
+.analysis-action-btn {
+  padding: 8px 16px;
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.analysis-action-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* Tool chip (attachment-sized) in attachment-preview-strip */
+.attachment-card--tool {
+  background: var(--analysis-box) !important;
+}
+
+.attachment-card--tool .attachment-tool-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Tool chips in sent messages */
+.message-tool-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tool-chip--sent {
+  background: var(--analysis-box);
+  color: #fff;
 }
 
 /* Kartlag Panel */

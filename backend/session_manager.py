@@ -199,23 +199,39 @@ class SessionManager:
         )
         return "".join(lines)
 
-    async def send_message(self, session, message: str, map_context=None, chat_id: str = "") -> dict:
+    async def send_message(self, session, message: str, map_context=None, chat_id: str = "", tool_hints: list | None = None) -> dict:
         """
         Send *message* to an active Copilot *session* and return a dict with
         the reply content and any pending map actions.
 
+        If *tool_hints* is provided (list of MCP tool identifiers such as
+        ``"vector-buffer"``), a directive block is prepended so the model
+        prioritises those tools when answering.
+
         Callers are responsible for persisting messages to the database.
         """
+        parts = []
+        if chat_id:
+            parts.append(f"[SESSION_ID: {chat_id}]")
+
+        if tool_hints:
+            hint_list = ", ".join(tool_hints)
+            parts.append(
+                f"[TOOL HINTS]\n"
+                f"The user has explicitly selected the following tools for this request: {hint_list}.\n"
+                f"You SHOULD use these tools when answering. Prioritise them over other tools.\n"
+                f"[/TOOL HINTS]"
+            )
+
         if map_context:
             layer_summary = "\n".join(
                 f"- {l.get('name', 'Unnamed')} ({l.get('shape', '?')}): {json.dumps(l.get('geoJson'))}"
                 for l in map_context
             )
-            full_message = f"[SESSION_ID: {chat_id}]\n[CURRENT MAP STATE]\n{layer_summary}\n\n[USER MESSAGE]\n{message}"
-        elif chat_id:
-            full_message = f"[SESSION_ID: {chat_id}]\n\n[USER MESSAGE]\n{message}"
-        else:
-            full_message = message
+            parts.append(f"[CURRENT MAP STATE]\n{layer_summary}")
+
+        parts.append(f"[USER MESSAGE]\n{message}")
+        full_message = "\n\n".join(parts)
 
         try:
             response = await session.send_and_wait(full_message, timeout=900)

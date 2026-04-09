@@ -127,6 +127,7 @@ async def chat(request: Request):
     if not message:
         return JSONResponse({"error": "'message' is required."}, status_code=400)
     map_context = data.get("map_context")
+    tool_hints = data.get("tool_hints") or []
 
     chat_id: str | None = data.get("chat_id")
     created_chat = not chat_id
@@ -181,7 +182,7 @@ async def chat(request: Request):
 
     # Send to Copilot
     try:
-        result = await manager.send_message(copilot_session, message, map_context=map_context, chat_id=chat_id)
+        result = await manager.send_message(copilot_session, message, map_context=map_context, chat_id=chat_id, tool_hints=tool_hints)
     except Exception as exc:
         # Finalise the turn even on error so partial data isn't lost.
         tracker.finalise_turn()

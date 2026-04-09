@@ -14,33 +14,51 @@ import {
   SquaresUnite,
   MoveHorizontal,
   LayoutGrid,
+  FileText,
+  Search,
+  MapPin,
+  Paintbrush,
+  Church,
+  Check,
 } from 'lucide-react';
 
-const FILTER_OPTIONS = ['Overlegg', 'Buffer', 'Forenkling', 'Geometri'];
+const FILTER_OPTIONS = ['Overlegg', 'Buffer', 'Forenkling', 'Geometri', 'Data', 'Kart'];
 
 const ALL_TOOLS = [
-  { name: 'Buffer',          icon: Circle,           category: 'Buffer',     desc: 'Opprett en buffersone rundt geometrier'                 },
-  { name: 'Snitt',           icon: SquaresIntersect, category: 'Overlegg',   desc: 'Finn overlappende areal mellom to lag'                  },
-  { name: 'Forening',        icon: Layers,           category: 'Overlegg',   desc: 'Slå sammen geometrier fra to lag til ett'               },
-  { name: 'Klipp',           icon: Scissors,         category: 'Geometri',   desc: 'Klipp et lag til grensen av et annet'                   },
-  { name: 'Oppløs',          icon: Ungroup,          category: 'Forenkling', desc: 'Aggreger og slå sammen objekter etter felles attributt' },
-  { name: 'Differanse',      icon: MinusCircle,      category: 'Overlegg',   desc: 'Trekk én geometri fra en annen'                         },
-  { name: 'Konveks Hylster', icon: SquareDot,        category: 'Geometri',   desc: 'Beregn konvekst hylster for et sett med geometrier'     },
-  { name: 'Sentroid',        icon: CircleDotDashed,  category: 'Geometri',   desc: 'Beregn sentroiden til en geometri'                      },
-  { name: 'Forenkle',        icon: Minimize2,        category: 'Forenkling', desc: 'Forenkle geometri uten å ødelegge topologien'           },
-  { name: 'Romlig Kobling',  icon: SquaresUnite,     category: 'Overlegg',   desc: 'Koble attributter basert på romlige relasjoner'         },
-  { name: 'Nærmeste Punkt',  icon: MoveHorizontal,   category: 'Buffer',     desc: 'Finn nærmeste punkter mellom to geometrier'             },
-  { name: 'Voronoi',         icon: LayoutGrid,       category: 'Buffer',     desc: 'Generer et Voronoi-diagram fra et punktlag'             },
+  // Spatial / vector operations (vector_server)
+  { name: 'Buffer',          icon: Circle,           category: 'Buffer',     desc: 'Lag en buffersone (f.eks. 500m radius) rundt punkter, linjer eller flater for nærhetanalyser',   mcpTool: 'vector-buffer'      },
+  { name: 'Snitt',           icon: SquaresIntersect, category: 'Overlegg',   desc: 'Finn det overlappende arealet mellom to geometrier — nyttig for å se hva som finnes innenfor et bestemt område', mcpTool: 'vector-intersection' },
+  { name: 'Forening',        icon: Layers,           category: 'Overlegg',   desc: 'Slå sammen to eller flere geometrier til én samlet flate',            mcpTool: 'vector-intersection' },
+  { name: 'Klipp',           icon: Scissors,         category: 'Geometri',   desc: 'Klipp et geometrilag til grensene av et annet — bruk for å begrense data til et interesseområde',   mcpTool: 'vector-intersection' },
+  { name: 'Oppløs',          icon: Ungroup,          category: 'Forenkling', desc: 'Aggreger mange objekter til færre basert på felles attributt, f.eks. slå sammen kommuner i et fylke', mcpTool: 'vector-intersection' },
+  { name: 'Differanse',      icon: MinusCircle,      category: 'Overlegg',   desc: 'Fjern én geometri fra en annen — f.eks. finn arealet utenfor en buffersone',               mcpTool: 'vector-intersection' },
+  { name: 'Konveks Hylster', icon: SquareDot,        category: 'Geometri',   desc: 'Beregn det minste omsluttende polygonet rundt et sett av punkter eller geometrier',     mcpTool: 'vector-envelope'    },
+  { name: 'Sentroid',        icon: CircleDotDashed,  category: 'Geometri',   desc: 'Finn midtpunktet (sentroiden) til en flate — nyttig for å plassere etiketter eller markører', mcpTool: 'vector-get_coordinates' },
+  { name: 'Forenkle',        icon: Minimize2,        category: 'Forenkling', desc: 'Redusér antall punkter i en geometri for raskere visning uten å miste den overordnede formen',       mcpTool: 'vector-envelope'    },
+  { name: 'Romlig Kobling',  icon: SquaresUnite,     category: 'Overlegg',   desc: 'Koble attributter fra et lag til et annet basert på romlig overlapp (spatial join)',       mcpTool: 'vector-point_in_polygon' },
+  { name: 'Nærmeste Punkt',  icon: MoveHorizontal,   category: 'Buffer',     desc: 'Finn de nærmeste punktene mellom to geometrier — f.eks. avstand til nærmeste vei eller bygning', mcpTool: 'vector-get_coordinates' },
+  { name: 'Voronoi',         icon: LayoutGrid,       category: 'Buffer',     desc: 'Generer Voronoi-diagram fra punkter — deler kartet i soner der hvert punkt har sitt nærmeste område', mcpTool: 'vector-buffer'      },
+  // Data / lookup tools
+  { name: 'Søk dokumenter',  icon: Search,           category: 'Data',       desc: 'Søk i indekserte PDF-dokumenter med fulltekst, fuzzy eller semantisk søk',                        mcpTool: 'search-search_hybrid' },
+  { name: 'Hent dokument',   icon: FileText,         category: 'Data',       desc: 'Hent og les innholdet i et bestemt PDF-dokument fra dokumentlageret',                            mcpTool: 'docs-fetch_document' },
+  // Geo / cultural environment
+  { name: 'Kulturmiljøsøk',  icon: MapPin,          category: 'Kart',       desc: 'Finn kulturmiljøer innenfor en gitt radius fra et punkt — søk etter fredede områder nær en lokasjon', mcpTool: 'geo-buffer_search'   },
+  { name: 'Verdensarv',      icon: Church,         category: 'Kart',       desc: 'Hent alle norske verdensarvsteder med beskrivelse og geometri, og vis dem på kartet',             mcpTool: 'vector-get_verdensarv_sites' },
+  { name: 'Tegn på kart',    icon: Paintbrush,       category: 'Kart',       desc: 'Be AI-en tegne former, punkter eller linjer direkte på kartet basert på analyseresultater',       mcpTool: 'map-draw_shape'       },
 ];
 
 const FEATURED_TOOLS = ALL_TOOLS.slice(0, 6);
 
-export function Analysis() {
+export { ALL_TOOLS };
+
+export function Analysis({ selectedTools = [], onToggleTool, onGoToChat }) {
   const [search, setSearch]         = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [showAll, setShowAll]       = useState(false);
   const [activeFilters, setActiveFilters] = useState(new Set());
   const [sortAlpha, setSortAlpha]         = useState(false);
+
+  const selectedNames = new Set(selectedTools.map(t => t.name));
 
   function toggleFilter(opt) {
     setActiveFilters(prev => {
@@ -153,10 +171,17 @@ export function Analysis() {
       <div className="analysis-grid">
         {visibleBoxes.length > 0 ? visibleBoxes.map(tool => {
           const Icon = tool.icon;
+          const isSelected = selectedNames.has(tool.name);
           return (
-            <button key={tool.name} className={`analysis-tool-box`}>
+            <button
+              key={tool.name}
+              className={`analysis-tool-box${isSelected ? ' selected' : ''}`}
+              onClick={() => onToggleTool?.(tool)}
+            >
               <span className="analysis-tool-box-icon">
-                {typeof Icon === 'string' ? Icon : <Icon size={22} strokeWidth={2.1} />}
+                {isSelected
+                  ? <Check size={22} strokeWidth={2.5} />
+                  : (typeof Icon === 'string' ? Icon : <Icon size={22} strokeWidth={2.1} />)}
               </span>
               <span className="analysis-tool-box-name">{tool.name}</span>
               <span className="analysis-tool-box-desc">{tool.desc}</span>
@@ -166,6 +191,18 @@ export function Analysis() {
           <p className="analysis-no-results">Ingen verktøy matcher søket ditt.</p>
         )}
       </div>
+
+      {/* Floating action bar when tools are selected */}
+      {selectedTools.length > 0 && (
+        <div className="analysis-action-bar">
+          <span className="analysis-action-count">
+            {selectedTools.length} verktøy valgt
+          </span>
+          <button className="analysis-action-btn" onClick={onGoToChat}>
+            Bruk i chat →
+          </button>
+        </div>
+      )}
 
     </div>
   );

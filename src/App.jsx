@@ -91,6 +91,17 @@ function App() {
   ]);
 
   const [drawnLayers, setDrawnLayers] = useState([]);
+  const [selectedTools, setSelectedTools] = useState([]);
+
+  const toggleTool = (tool) => {
+    setSelectedTools(prev => {
+      const exists = prev.some(t => t.name === tool.name);
+      if (exists) return prev.filter(t => t.name !== tool.name);
+      return [...prev, tool];
+    });
+  };
+
+  const clearSelectedTools = () => setSelectedTools([]);
 
   const upsertDrawnLayer = (info) => {
     setDrawnLayers(previousLayers => {
@@ -162,7 +173,11 @@ function App() {
           onRemoveDrawnLayer={removeDrawnLayer}
           onFlyToLayer={setFlyTarget}
           chatUser={chatUser}
-          onUserChange={setChatUser} />
+          onUserChange={setChatUser}
+          selectedTools={selectedTools}
+          onToggleTool={toggleTool}
+          onClearSelectedTools={clearSelectedTools}
+          onGoToChat={() => setActivePanel('Chatbot')} />
 
         <main className="map-stage">
           <Map
