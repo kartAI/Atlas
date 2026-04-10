@@ -358,15 +358,15 @@ async def save_chunks(document_id: int, chunks: list[dict]) -> tuple[int, int]:
                         cur, document_id, None, chunk,
                         local_id_map[chunk["local_id"]][1],
                     )
-                    if db_id is not None:
-                        local_id_to_db_id[chunk["local_id"]] = db_id
+                    local_id_to_db_id[chunk["local_id"]] = db_id
 
                 for chunk in child_chunks:
                     parent_db_id = local_id_to_db_id.get(chunk["local_parent_id"])
                     if parent_db_id is None:
-                        logger.warning(
-                            "save_chunks: parent local_id=%s not found for child chunk (doc %s) — inserting as top-level",
-                            chunk["local_parent_id"], document_id,
+                        raise RuntimeError(
+                            f"save_chunks: parent local_id={chunk['local_parent_id']!r} "
+                            f"not found in id map for doc {document_id} — "
+                            "parent INSERT may have silently returned no row"
                         )
                     await _insert_chunk(
                         cur, document_id, parent_db_id, chunk,
@@ -390,7 +390,7 @@ async def _insert_chunk(
 ) -> int | None:
     """
     Insert a single chunk row into the chunks table using the given cursor.
-    Returns the new DB id, or None if the insert returned no rows.
+    Returns the new DB id. Raises RuntimeError if the INSERT returns no row.
     """
     meta     = chunk["metadata"]
     emb_str  = json.dumps(vector) if vector else None
@@ -429,7 +429,12 @@ async def _insert_chunk(
         },
     )
     row = await cur.fetchone()
-    return row["id"] if row else None
+    if row is None:
+        raise RuntimeError(
+            f"_insert_chunk: INSERT returned no row for document_id={document_id} "
+            f"chunk_index={chunk['chunk_index']} — unexpected empty RETURNING result"
+        )
+    return row["id"]
 
 
 # ---------------------------------------------------------------------------
