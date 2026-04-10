@@ -6,13 +6,13 @@ import { ContentPanel } from './components/ContentPanel.jsx';
 import Map from './components/Map.jsx';
 import { apiFetch, clearToken, clearActiveChatId, getToken } from './utils/auth';
 
-import { faLayerGroup, faChartLine, faFileExport } from '@fortawesome/free-solid-svg-icons';
+import { faLayerGroup, faWrench, faFileExport } from '@fortawesome/free-solid-svg-icons';
 import { faMessage } from '@fortawesome/free-regular-svg-icons';
 
 const menuItems = [
     { id: 'Chatbot', label: 'Chatbot', icon: faMessage },
     { id: 'Kartlag', label: 'Kartlag', icon: faLayerGroup },
-    { id: 'Analyse', label: 'Analyse', icon: faChartLine },
+    { id: 'Verktøy', label: 'Verktøy', icon: faWrench },
     { id: 'Eksporter', label: 'Eksporter', icon: faFileExport },
 ];
 

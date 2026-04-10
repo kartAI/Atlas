@@ -226,5 +226,89 @@ async def get_verdensarv_sites() -> str:
         logger.error(f"Failed to fetch world heritage sites: {e}")
         return f"Error fetching world heritage sites: {e}"
 
+@vector_mcp.tool()
+async def voronoi(geojson: str) -> str:
+    """
+    Generates a Voronoi diagram from a GeoJSON FeatureCollection of points (or any geometries,
+    whose centroids are used as input seeds). Uses PostGIS ST_VoronoiPolygons for a true
+    Delaunay-based result.
+
+    Returns a GeoJSON FeatureCollection where each Voronoi polygon carries the properties
+    of the seed feature it was generated from.
+    Send the result to map-draw_shape() to visualize it on the map.
+
+    Use this tool whenever the user asks for Voronoi analysis, influence zones, nearest-feature
+    partitioning, or any spatial tessellation from a set of point or polygon features.
+
+    Args:
+        geojson: A GeoJSON FeatureCollection (points or polygons). Each feature may carry
+                 any properties — they are preserved on the output polygons.
+    """
+    try:
+        collection = json.loads(geojson)
+    except (json.JSONDecodeError, TypeError) as e:
+        return json.dumps({"error": f"Ugyldig GeoJSON: {e}"})
+
+    features_in = collection.get("features", [])
+    if len(features_in) < 2:
+        return json.dumps({"error": "Minst 2 punkter kreves for å generere et Voronoi-diagram."})
+
+    try:
+        async with get_connection() as conn:
+            async with conn.cursor() as cur:
+                # Build seed centroids table from the supplied features
+                await cur.execute(
+                    """
+                    WITH seeds AS (
+                        SELECT
+                            ordinality AS seed_id,
+                            feat,
+                            ST_Centroid(
+                                ST_Transform(
+                                    ST_SetSRID(ST_GeomFromGeoJSON(feat->>'geometry'), 4326),
+                                    25833
+                                )
+                            ) AS centroid
+                        FROM json_array_elements(%s::json) WITH ORDINALITY AS t(feat, ordinality)
+                    ),
+                    voronoi_polys AS (
+                        SELECT (ST_Dump(ST_VoronoiPolygons(ST_Collect(centroid)))).geom AS voronoi_geom
+                        FROM seeds
+                    )
+                    SELECT
+                        s.seed_id,
+                        s.feat->'properties' AS properties,
+                        ST_AsGeoJSON(ST_Transform(v.voronoi_geom, 4326)) AS geojson
+                    FROM voronoi_polys v
+                    JOIN seeds s ON ST_Contains(v.voronoi_geom, s.centroid)
+                    ORDER BY s.seed_id;
+                    """,
+                    (json.dumps(features_in),)
+                )
+                rows = await cur.fetchall()
+                if not rows:
+                    return json.dumps({"error": "Voronoi-beregning returnerte ingen polygoner."})
+
+                out_features = []
+                for row in rows:
+                    r = dict(row)
+                    geometry = json.loads(r["geojson"]) if r["geojson"] else None
+                    properties = r["properties"] or {}
+                    out_features.append({
+                        "type": "Feature",
+                        "geometry": geometry,
+                        "properties": properties,
+                    })
+
+                return json.dumps(
+                    {"type": "FeatureCollection", "features": out_features},
+                    ensure_ascii=False,
+                    default=str,
+                )
+    except Exception as e:
+        logger.error(f"voronoi failed: {e}")
+        return json.dumps({"error": f"Voronoi-beregning feilet: {e}"})
+
+
 # Mount the vector MCP ASGI app at the /mcp/vector path
 vector_app = vector_mcp.http_app(path="/mcp")

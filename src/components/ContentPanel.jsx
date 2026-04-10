@@ -1,5 +1,5 @@
 import { ChatInterface } from './ChatInterface';
-import { Analysis } from './Analysis';
+import { ToolList } from './ToolList';
 import { KartlagPanel } from './KartlagPanel';
 import { ExportPanel } from './ExportPanel';
 
@@ -44,13 +44,8 @@ export function ContentPanel({ activePanel, onClose, layers, drawnLayers, onSetD
                 />
             )}
 
-            {activePanel === 'Analyse' && (
-                <Analysis
-                    layers={layers}
-                    drawnLayers={drawnLayers}
-                    onSetDrawnLayerVisible={onSetDrawnLayerVisible}
-                    onRemoveDrawnLayer={onRemoveDrawnLayer}
-                    onFlyToLayer={onFlyToLayer}
+            {activePanel === 'Verktøy' && (
+                <ToolList
                     selectedTools={selectedTools}
                     onToggleTool={onToggleTool}
                     onGoToChat={onGoToChat}
