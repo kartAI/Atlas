@@ -54,6 +54,7 @@ Applikasjonen er bygget rundt en enkel idé: Hjelpe saksbehandlere med KU-analys
 | `src/` | React-applikasjon, kartgrensesnitt, chatgrensesnitt, eksport og klientverktøy |
 | `backend/` | Starlette-server, autentisering, databasetilgang, sesjonshåndtering, konfigurasjon og montering av MCP-tjenere |
 | `backend/mcp_servers/` | Den aktive katalogen for MCP-tjenere som brukes av applikasjonen |
+| `backend/agent_tool_catalog.py` | Normalisert verktøykatalog for SDK-agenter, inkludert MCP-verktøy, databackede kapabiliteter, risikoer og ekskluderte interne flater |
 | `public/` | Grafiske profileringsressurser brukt av frontend |
 
 ## MCP-Tjenere I Bruk
@@ -65,6 +66,7 @@ Applikasjonen er bygget rundt en enkel idé: Hjelpe saksbehandlere med KU-analys
 | `docs_server` | PDF-listing og tekstuttrekk fra Azure Blob Storage |
 | `vector_server` | GeoJSON-baserte romlige operasjoner og domenespesifikk geometriuthenting |
 | `map_server` | Sender GeoJSON-resultater tilbake til frontend som tegnbare lag |
+| `search_server` | Dokumentsøk med fulltekst, fuzzy, semantisk og hybrid søk, samt status og indeksoppdatering |
 
 ## Teknologistack
 
@@ -143,7 +145,7 @@ npm run dev
 | Type | Flate |
 | --- | --- |
 | REST | `/api/auth/*`, `/api/chats`, `/api/chat`, `/api/documents` |
-| MCP | `/mcp/db/mcp`, `/mcp/geo/mcp`, `/mcp/docs/mcp`, `/mcp/vector/mcp`, `/mcp/map/mcp` |
+| MCP | `/mcp/db/mcp`, `/mcp/geo/mcp`, `/mcp/docs/mcp`, `/mcp/vector/mcp`, `/mcp/map/mcp`, `/mcp/search/mcp` |
 
 ## Operasjonelle Notater
 
