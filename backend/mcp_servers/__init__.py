@@ -7,5 +7,5 @@
 #   - vector_server.py  — PostGIS / Shapely spatial analysis tools
 #   - search_server.py  — Document search (full-text, fuzzy, hybrid)
 #
-# Planned (separate Docker containers, registered via env vars in session_manager.py):
+# Inactive / planned (not mounted):
 #   - postgis_raster  — PostGIS raster analysis tools
