@@ -184,7 +184,7 @@ async def index_all_documents(force: bool = False) -> str:
 async def get_indexing_status() -> str:
     """
     Vis statusoversikt for dokumentindeksering fra Azure Blob Storage.
-    Returnerer antall PDF-filer per status: new, processing, ready, failed.
+    Returnerer antall PDF-filer per status: new, processing, ready, partial, failed.
     Teller bare dokumenter med source_blob (ekte PDF-er fra Blob Storage).
     """
     try:

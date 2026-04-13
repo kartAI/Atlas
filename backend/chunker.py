@@ -37,6 +37,7 @@ MIN_SECTION_CHARS            Sections shorter than this are kept as-is (no split
 MIN_HEADINGS_FOR_STRUCTURE   Min headings required before falling back to paragraph mode.
 """
 
+from collections import Counter
 import logging
 import re
 from typing import Optional
@@ -71,7 +72,10 @@ _NUMBERED_SECTION_RE = re.compile(
 # (-et, -en) so "nullalternativet" must also match. The leading \b prevents
 # false positives on unrelated words.
 _ALTERNATIVE_RE = re.compile(
-    r'\b(nullalternativ|alternativ\s*\d+[a-z]?|alternativ\s*[a-z])',
+    r'\b('
+    r'nullalternativ(?:et|en)?'
+    r'|alternativ\s*(?:\d+[a-z]?|[a-z])(?![a-zæøå0-9])'
+    r')',
     re.IGNORECASE | re.UNICODE,
 )
 
@@ -99,6 +103,7 @@ _KU_SECTION_KEYWORDS: set[str] = {
     "usikkerhet", "kunnskapsmangler",
     "referanser", "litteratur", "kilder", "vedlegg",
 }
+_KU_KEYWORD_MAX_SUFFIX_CHARS = 40
 
 # ---------------------------------------------------------------------------
 # Topic classification rules (first match wins)
@@ -184,7 +189,6 @@ def _detect_body_font_size(blocks: list[dict]) -> float:
     Used as the baseline for relative heading detection.
     Falls back to 11.0 pt if no font size data is available.
     """
-    from collections import Counter
     sizes = [
         round(b.get("font_size", 0))
         for b in blocks
@@ -215,9 +219,10 @@ def _is_known_ku_keyword(text: str) -> bool:
     lower = text.strip().lower()
     if lower in _KU_SECTION_KEYWORDS:
         return True
-    # Allow "keyword: ..." or "keyword — ..." prefix forms
+    # Allow short heading-like prefix forms such as "Sammendrag: ..."
+    # while excluding paragraph-length body text that merely starts the same way.
     for kw in _KU_SECTION_KEYWORDS:
-        if lower.startswith(kw) and len(lower) < len(kw) + 40:
+        if lower.startswith(kw) and len(lower) < len(kw) + _KU_KEYWORD_MAX_SUFFIX_CHARS:
             return True
     return False
 
@@ -668,13 +673,19 @@ def _structure_based_chunks(
             chunk_index += 1
 
             # Child chunks: cover the full section body
+            # Prepend heading context so each child's embedding captures which
+            # section it belongs to (same pattern as parent chunk).
             for group_text in child_groups:
+                child_text = (
+                    f"{heading_prefix}\n\n{group_text}".strip()
+                    if heading_prefix else group_text
+                )
                 chunks.append({
                     "local_id":        local_id,
                     "local_parent_id": parent_local_id,
                     "chunk_index":     chunk_index,
-                    "text":            group_text,
-                    "char_count":      len(group_text),
+                    "text":            child_text,
+                    "char_count":      len(child_text),
                     "metadata":        dict(base_meta),
                 })
                 local_id    += 1

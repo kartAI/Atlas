@@ -6,7 +6,15 @@ _PDF_SUFFIXES = (".pdf", ".PDF")
 
 
 def _get_container_client():
-    assert AZURE_CONNECTION_STRING and BLOB_CONTAINER_NAME
+    missing = []
+    if not AZURE_CONNECTION_STRING:
+        missing.append("AZURE_CONNECTION_STRING")
+    if not BLOB_CONTAINER_NAME:
+        missing.append("BLOB_CONTAINER_NAME")
+    if missing:
+        raise ValueError(
+            "Missing Azure Blob Storage configuration: " + ", ".join(missing)
+        )
     blob_service = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
     return blob_service.get_container_client(BLOB_CONTAINER_NAME)
 

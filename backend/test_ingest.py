@@ -5,7 +5,9 @@ Unit tests for ingest pipeline and search service status/filtering logic.
 Covers:
   - stale-processing recovery in run_pipeline()
   - status transitions in process_document(): ready / partial / failed
+  - save_chunks() cleanup when a re-index produces zero chunks
   - search query filtering (indexing_status IN ('ready', 'partial'))
+  - semantic chunk search SQL shape (candidate-first vector search)
 
 All database, Azure Blob Storage, and embedding API calls are mocked.
 No running services or environment variables required.
@@ -133,6 +135,48 @@ def _fake_chunks(n: int) -> list[dict]:
         }
         for i in range(n)
     ]
+
+
+class _FakeCursor:
+    def __init__(self):
+        self.execute_calls: list[tuple[str, dict | None]] = []
+
+    async def execute(self, sql: str, params=None):
+        self.execute_calls.append((sql, params))
+
+    async def fetchone(self):
+        return None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeTransaction:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeConnection:
+    def __init__(self, cursor: _FakeCursor):
+        self._cursor = cursor
+
+    def transaction(self):
+        return _FakeTransaction()
+
+    def cursor(self):
+        return self._cursor
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +357,32 @@ def test_single_chunk_fully_embedded_is_ready():
 
 
 # ===========================================================================
-# 3. Search indexing_status filtering
+# 3. save_chunks() cleanup on empty chunk sets
+# ===========================================================================
+
+print("\n# save_chunks cleanup")
+
+
+def test_save_chunks_empty_still_deletes_existing_rows():
+    """Re-indexing to zero chunks must still clear stale chunk rows for the document."""
+    async def go():
+        fake_cursor = _FakeCursor()
+        fake_conn = _FakeConnection(fake_cursor)
+
+        with patch.object(ingest_pipeline, "get_connection", return_value=fake_conn):
+            result = await ingest_pipeline.save_chunks(123, [])
+
+        assert_equal("empty save_chunks returns zero counts", result, (0, 0))
+        assert_equal("empty save_chunks issues one DELETE", len(fake_cursor.execute_calls), 1)
+        sql, params = fake_cursor.execute_calls[0]
+        assert_in("empty save_chunks deletes old rows", "DELETE FROM chunks", sql)
+        assert_equal("delete targets the current document", params["doc_id"], 123)
+
+    asyncio.run(go())
+
+
+# ===========================================================================
+# 4. Search indexing_status filtering
 # ===========================================================================
 
 print("\n# Search indexing_status filtering")
@@ -357,6 +426,32 @@ def test_semantic_chunk_search_filters_status():
     asyncio.run(go())
 
 
+def test_semantic_chunk_search_uses_candidate_first_vector_order():
+    """Chunk semantic search should order chunk candidates by vector distance before deduping."""
+    async def go():
+        with patch.object(search_service, "query", new_callable=AsyncMock) as mock_q:
+            mock_q.return_value = []
+            await search_service._search_semantic_chunks([0.1] * 10, "regelverk", 10)
+            sql, params = mock_q.call_args.args
+            assert_in("semantic chunk search uses candidate CTE", "WITH nearest_chunks AS", sql)
+            assert_in(
+                "semantic chunk search orders candidates by vector distance",
+                "ORDER BY c.embedding <=> %(emb)s::vector",
+                sql,
+            )
+            assert_in("semantic chunk search limits candidate set", "LIMIT %(candidate_lim)s", sql)
+            assert_equal(
+                "semantic chunk candidate limit uses configured heuristic",
+                params["candidate_lim"],
+                max(
+                    10 * search_service._SEMANTIC_CHUNK_CANDIDATE_MULTIPLIER,
+                    search_service._SEMANTIC_CHUNK_MIN_CANDIDATES,
+                ),
+            )
+
+    asyncio.run(go())
+
+
 def test_semantic_document_fallback_filters_status():
     """_search_semantic_documents SQL must exclude non-searchable documents."""
     async def go():
@@ -365,6 +460,39 @@ def test_semantic_document_fallback_filters_status():
             await search_service._search_semantic_documents([0.1] * 10, "regelverk", 10)
             sql = mock_q.call_args.args[0]
             assert_in("semantic doc fallback filters by status", _STATUS_FILTER, sql)
+
+    asyncio.run(go())
+
+
+def test_semantic_chunk_search_truncates_content():
+    """Chunk semantic search should return snippet-sized content like other search backends."""
+    async def go():
+        long_content = "x" * (search_service._SNIPPET_LENGTH + 25)
+        with patch.object(search_service, "query", new_callable=AsyncMock) as mock_q:
+            mock_q.return_value = [{
+                "id": 1,
+                "title": "Doc",
+                "content": long_content,
+                "score": 0.9,
+                "heading_path": "1 Sammendrag",
+                "section_title": "Sammendrag",
+                "topic_type": "summary",
+                "alternative": None,
+                "delomrade": None,
+                "contains_table": False,
+                "page_start": 1,
+                "page_end": 1,
+                "chunk_index": 0,
+                "chunk_id": 10,
+            }]
+            results = await search_service._search_semantic_chunks([0.1] * 10, "regelverk", 10)
+            assert_equal("semantic chunk search returns one row", len(results), 1)
+            assert_true("semantic chunk content truncated", results[0]["content"].endswith("…"))
+            assert_equal(
+                "semantic chunk content truncates to snippet length",
+                len(results[0]["content"]),
+                search_service._SNIPPET_LENGTH + 1,
+            )
 
     asyncio.run(go())
 
@@ -397,11 +525,15 @@ _TESTS = [
     test_zero_embeddings_with_doc_fallback_sets_partial,
     test_extraction_error_sets_failed,
     test_single_chunk_fully_embedded_is_ready,
+    # save_chunks cleanup
+    test_save_chunks_empty_still_deletes_existing_rows,
     # search filtering
     test_full_text_search_filters_status,
     test_fuzzy_search_filters_status,
     test_semantic_chunk_search_filters_status,
+    test_semantic_chunk_search_uses_candidate_first_vector_order,
     test_semantic_document_fallback_filters_status,
+    test_semantic_chunk_search_truncates_content,
     test_full_text_empty_query_skips_db,
 ]
 

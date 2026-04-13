@@ -3,7 +3,7 @@ Ingest pipeline for PDF documents from Azure Blob Storage.
 
 Pipeline steps per document:
   1. discover_documents()       — list blobs with metadata from Azure
-  2. should_reindex_document()  — skip if unchanged and already indexed
+  2. process_document()         — atomically claim an eligible document row
   3. extract_blocks()           — fetch PDF and extract structured text blocks (blocking → thread)
   4. chunk_document()           — split into structure-aware chunks (heading-based, from chunker.py)
   5. save_indexed_document()    — upsert into documents table (content for full-text search)
@@ -19,10 +19,10 @@ Status model (indexing_status):
                embeddings failed; automatically retried on next pipeline run
   failed     — extraction or processing error
 
-Legacy functions kept for reference (no longer called in the main pipeline):
-  extract_text()       — plain text extraction (still used by docs_server via pdf_extractor)
-  chunk_text()         — fixed-size character chunking (superseded by chunker.py)
-  generate_embeddings() — averaged document embedding (fallback for doc-level embedding)
+Compatibility / fallback helpers kept in this module:
+  extract_text()        — plain text extraction fallback if structured extraction is empty
+  chunk_text()          — fixed-size chunking used only for document-level embedding fallback
+  generate_embeddings() — averaged document embedding used only for document-level fallback
 
 Entry points:
   run_pipeline(force, retry_failed)  — process all blobs, with concurrency control
@@ -51,6 +51,9 @@ _CONCURRENCY = 3
 # (crashed/killed worker) and will be reclaimed on the next pipeline run.
 _STALE_PROCESSING_MINUTES = 30
 
+# Maximum number of texts sent to the embeddings API in one request.
+_EMBEDDING_BATCH_SIZE = 50  # TUNE
+
 
 # ---------------------------------------------------------------------------
 # Step 1: Discover documents
@@ -68,54 +71,7 @@ async def discover_documents() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Step 2: Decide whether to reindex
-# ---------------------------------------------------------------------------
-
-async def should_reindex_document(
-    blob_name: str,
-    last_modified: str,
-    file_hash: str,
-    retry_failed: bool = True,
-) -> bool:
-    """
-    Returns True if the document should be (re)indexed.
-
-    Skips if status=ready and neither last_modified nor file_hash has changed.
-    Skips if status=processing (already running — avoids duplicate runs).
-    Retries if status=failed and retry_failed=True.
-    """
-    rows = await query(
-        "SELECT indexing_status, last_modified, file_hash FROM documents WHERE source_blob = %(b)s",
-        {"b": blob_name},
-    )
-
-    if not rows:
-        return True  # new document, not seen before
-
-    doc = dict(rows[0])
-    status = doc["indexing_status"]
-
-    if status == "processing":
-        logger.info("should_reindex: '%s' already processing — skipping", blob_name)
-        return False
-
-    if status == "ready":
-        # Only re-index if something actually changed
-        stored_lm = str(doc.get("last_modified") or "")
-        stored_hash = doc.get("file_hash") or ""
-        changed = stored_lm != str(last_modified) or stored_hash != file_hash
-        return changed
-
-    if status == "failed":
-        return retry_failed
-
-    # status = 'new', 'partial', or unexpected value → process it.
-    # 'partial' means content was indexed but embeddings failed — always retry.
-    return True
-
-
-# ---------------------------------------------------------------------------
-# Step 3: Extract text (legacy — kept for reference; not used in main pipeline)
+# Step 3: Plain-text extraction fallback
 # ---------------------------------------------------------------------------
 
 async def extract_text(blob_name: str) -> str:
@@ -123,8 +79,7 @@ async def extract_text(blob_name: str) -> str:
     Fetch the PDF from Blob Storage and extract its full text.
     Runs in a thread executor since fitz PDF parsing is blocking.
 
-    NOTE: Superseded by extract_blocks() in the main pipeline.
-    Kept here because docs_server.py calls pdf_extractor.fetch_document() directly.
+    Used as a fallback when structured extraction yields no usable content.
     """
     loop = asyncio.get_running_loop()
     t0 = time.perf_counter()
@@ -158,15 +113,15 @@ async def extract_blocks(blob_name: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Step 4: Chunk text (legacy — fixed-size, superseded by chunk_document())
+# Step 4: Fallback chunking for document-level embedding
 # ---------------------------------------------------------------------------
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[str]:
     """
     Split text into overlapping fixed-size chunks.
 
-    NOTE: Superseded by chunk_document() from chunker.py in the main pipeline.
-    Kept here to avoid breaking any external references.
+    Used only for the document-level embedding fallback path when per-chunk
+    embeddings are unavailable.
     """
     if not text:
         return []
@@ -180,22 +135,36 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[st
 
 
 # ---------------------------------------------------------------------------
-# Step 5: Generate embeddings (legacy — averaged doc vector, superseded)
+# Step 5: Generate a document-level fallback embedding
 # ---------------------------------------------------------------------------
 
 async def generate_embeddings(chunks: list[str]) -> list[float] | None:
     """
     Generate a single averaged embedding vector for a document.
 
-    NOTE: Superseded by per-chunk embedding in save_chunks() in the main pipeline.
-    Kept here to avoid breaking any external references.
+    Used only as a fallback when no per-chunk embeddings could be generated.
     """
     if not chunks:
         return None
 
     try:
         from embedding_client import get_embeddings
-        vectors = await get_embeddings(chunks)
+        vectors: list[list[float]] = []
+        for batch_start in range(0, len(chunks), _EMBEDDING_BATCH_SIZE):
+            batch = chunks[batch_start:batch_start + _EMBEDDING_BATCH_SIZE]
+            try:
+                batch_vectors = await get_embeddings(batch)
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.warning(
+                    "generate_embeddings: batch %d-%d failed: %s",
+                    batch_start,
+                    batch_start + len(batch) - 1,
+                    e,
+                )
+                continue
+            vectors.extend(batch_vectors)
     except ValueError as e:
         logger.warning("generate_embeddings: %s", e)
         return None
@@ -279,11 +248,6 @@ async def save_indexed_document(
 # Step 6: Save chunks with per-chunk embeddings
 # ---------------------------------------------------------------------------
 
-# Maximum number of chunk texts sent to the embeddings API in a single batch.
-# Keeps individual API calls manageable for documents with many chunks.
-_EMBEDDING_BATCH_SIZE = 50  # TUNE
-
-
 async def save_chunks(document_id: int, chunks: list[dict]) -> tuple[int, int]:
     """
     Embed all chunks (batched API calls) and upsert them into the chunks table.
@@ -299,6 +263,17 @@ async def save_chunks(document_id: int, chunks: list[dict]) -> tuple[int, int]:
     Embedding failures are non-fatal: affected chunks are stored without a vector.
     """
     if not chunks:
+        async with get_connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "DELETE FROM chunks WHERE document_id = %(doc_id)s",
+                        {"doc_id": document_id},
+                    )
+        logger.info(
+            "save_chunks: document_id=%s → cleared existing chunks; no new chunks to save",
+            document_id,
+        )
         return (0, 0)
 
     # --- Step 1: generate embeddings in batches (outside transaction — external API) ---
@@ -312,6 +287,8 @@ async def save_chunks(document_id: int, chunks: list[dict]) -> tuple[int, int]:
             try:
                 batch_vectors = await get_embeddings(batch)
                 all_vectors.extend(batch_vectors)
+            except ValueError:
+                raise
             except Exception as e:
                 logger.warning(
                     "save_chunks: embedding batch %d–%d failed for doc %s: %s",

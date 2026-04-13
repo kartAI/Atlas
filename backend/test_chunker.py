@@ -20,6 +20,7 @@ import textwrap
 from chunker import (
     chunk_document,
     blocks_to_text,
+    _detect_alternative,
     _is_heading,
     _detect_sections,
     _detect_body_font_size,
@@ -204,6 +205,26 @@ def test_metadata_fields():
     null_chunks = [c for c in chunks if "nullalternativ" in (c["metadata"].get("alternative") or "")]
     ok &= assert_true("nullalternativ detected in metadata", len(null_chunks) >= 1)
 
+    return ok
+
+
+def test_alternative_detection_does_not_overmatch_normal_words():
+    ok = True
+    ok &= assert_equal(
+        "plain 'alternativ vurdering' does not become alternativ v",
+        _detect_alternative("Alternativ vurdering"),
+        None,
+    )
+    ok &= assert_equal(
+        "embedded phrase does not become alternativ v",
+        _detect_alternative("Vurdering av alternativ virkning"),
+        None,
+    )
+    ok &= assert_equal(
+        "single-letter alternative still matches",
+        _detect_alternative("5.2 Alternativ A"),
+        "alternativ a",
+    )
     return ok
 
 
@@ -399,6 +420,7 @@ def main():
         ("Long section -> parent + children",                 test_long_section_parent_and_children),
         ("Heading detection heuristics",                     test_heading_detection),
         ("Metadata: heading_path, alternative, delomrade",   test_metadata_fields),
+        ("Alternative detection avoids false positives",     test_alternative_detection_does_not_overmatch_normal_words),
         ("Fallback: no headings -> paragraph chunks",         test_fallback_paragraph_chunking),
         ("Edge case: empty blocks",                          test_empty_blocks),
         ("Edge case: single heading no body",                test_single_heading_no_body),
