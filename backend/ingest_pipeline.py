@@ -20,7 +20,7 @@ Status model (indexing_status):
   failed     — extraction or processing error
 
 Legacy functions kept for reference (no longer called in the main pipeline):
-  extract_text()       — plain text extraction (still used by docs_server indirectly via config)
+  extract_text()       — plain text extraction (still used by docs_server via pdf_extractor)
   chunk_text()         — fixed-size character chunking (superseded by chunker.py)
   generate_embeddings() — averaged document embedding (fallback for doc-level embedding)
 
@@ -35,11 +35,11 @@ import logging
 import time
 from typing import Optional
 
+from blob_storage import list_documents_with_metadata as _list_docs_meta_sync
 from db import query, execute, get_connection
-from config import (
+from pdf_extractor import (
     fetch_document as _fetch_document_sync,
     fetch_document_blocks as _fetch_document_blocks_sync,
-    list_documents_with_metadata as _list_docs_meta_sync,
 )
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ async def extract_text(blob_name: str) -> str:
     Runs in a thread executor since fitz PDF parsing is blocking.
 
     NOTE: Superseded by extract_blocks() in the main pipeline.
-    Kept here because docs_server.py calls config.fetch_document() directly.
+    Kept here because docs_server.py calls pdf_extractor.fetch_document() directly.
     """
     loop = asyncio.get_running_loop()
     t0 = time.perf_counter()
@@ -387,7 +387,7 @@ async def _insert_chunk(
     parent_db_id: int | None,
     chunk:        dict,
     vector:       list[float] | None,
-) -> int | None:
+) -> int:
     """
     Insert a single chunk row into the chunks table using the given cursor.
     Returns the new DB id. Raises RuntimeError if the INSERT returns no row.

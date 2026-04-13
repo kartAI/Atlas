@@ -43,10 +43,14 @@ _stub(
     get_connection=MagicMock(),
 )
 _stub(
-    "config",
+    "blob_storage",
+    list_documents_with_metadata=MagicMock(return_value=[]),
+    download_blob_bytes=MagicMock(return_value=b""),
+)
+_stub(
+    "pdf_extractor",
     fetch_document=MagicMock(return_value=""),
     fetch_document_blocks=MagicMock(return_value=[]),
-    list_documents_with_metadata=MagicMock(return_value=[]),
 )
 _stub(
     "embedding_client",

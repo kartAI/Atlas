@@ -5,7 +5,7 @@ Overview
 --------
 chunk_document(blocks, document_name, source_blob) -> list[dict]
 
-Input:  A list of text blocks produced by config.fetch_document_blocks().
+Input:  A list of text blocks produced by pdf_extractor.fetch_document_blocks().
         Each block: {"text": str, "page": int, "font_size": float, "is_bold": bool}
 
 Output: A list of chunk dicts, each containing:
@@ -81,9 +81,6 @@ _DELOMRADE_RE = re.compile(
     re.UNICODE,
 )
 
-# Table heuristic: lines containing multiple tabs or pipe characters
-_TABLE_LINE_RE = re.compile(r'(\t.*\t|\|.*\|)', re.MULTILINE)
-
 # ---------------------------------------------------------------------------
 # Known Norwegian KU section keywords (lowercase, exact or prefix match)
 # ---------------------------------------------------------------------------
@@ -138,7 +135,7 @@ def chunk_document(
     """
     Main entry point.
 
-    Takes a list of text blocks (from config.fetch_document_blocks) and returns
+    Takes a list of text blocks (from pdf_extractor.fetch_document_blocks) and returns
     a list of chunk dicts ready for storage and embedding.
 
     Returned chunk dict fields:
@@ -523,33 +520,37 @@ def _group_paragraphs_into_children(
     if not paragraphs:
         return []
 
+    _SEP = "\n\n"
+    _SEP_LEN = len(_SEP)
+
     groups: list[str] = []
     current_parts: list[str] = []
     current_len   = 0
     overlap_prefix = ""  # appended to the start of the next group
 
     for para in paragraphs:
-        para_len = len(para)
+        # Account for the separator that will be inserted between paragraphs
+        added_len = len(para) + (_SEP_LEN if current_parts else 0)
 
-        if current_len + para_len > target_size and current_parts:
+        if current_len + added_len > target_size and current_parts:
             # Flush current group
-            joined = "\n\n".join(current_parts)
-            group_text = (overlap_prefix + "\n\n" + joined) if overlap_prefix else joined
+            joined = _SEP.join(current_parts)
+            group_text = (overlap_prefix + _SEP + joined) if overlap_prefix else joined
             groups.append(group_text.strip())
 
             # Compute overlap for the next group
             overlap_prefix = joined[-overlap_chars:] if len(joined) > overlap_chars else joined
 
             current_parts = [para]
-            current_len   = para_len
+            current_len   = len(para)
         else:
             current_parts.append(para)
-            current_len += para_len
+            current_len += added_len
 
     # Flush final group
     if current_parts:
-        joined = "\n\n".join(current_parts)
-        group_text = (overlap_prefix + "\n\n" + joined) if (overlap_prefix and groups) else joined
+        joined = _SEP.join(current_parts)
+        group_text = (overlap_prefix + _SEP + joined) if (overlap_prefix and groups) else joined
         groups.append(group_text.strip())
 
     return [g for g in groups if g.strip()]

@@ -43,7 +43,8 @@ from starlette.routing import Mount, Route
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT, list_documents
+from blob_storage import list_documents
+from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT
 from copilot import CopilotClient
 from session_manager import SessionManager
 from usage_tracker import get_or_create_tracker, get_tracker
