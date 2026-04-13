@@ -9,11 +9,15 @@ import { ExportPanel } from './ExportPanel';
  * Keeps ChatInterface mounted even when the user switches panels so the
  * active conversation, auth state, and in-progress input do not reset.
  */
-export function ContentPanel({ activePanel, onClose, layers, drawnLayers, onSetDrawnLayerVisible, onRemoveDrawnLayer, onFlyToLayer, chatUser, onUserChange, onLayerCreated }) {
+export function ContentPanel({ activePanel, onClose, layers, drawnLayers, onSetDrawnLayerVisible, onRemoveDrawnLayer, onFlyToLayer, chatUser, onUserChange, onLayerCreated, panelWidth }) {
     const isOpen = !!activePanel;
 
+    const panelStyle = isOpen && panelWidth !== null
+        ? { width: `${panelWidth}px`, maxWidth: `${panelWidth}px`, transition: 'none' }
+        : {};
+
     return (
-        <div className={`content-panel ${isOpen ? 'content-panel--open' : 'content-panel--closed'}`}>
+        <div className={`content-panel ${isOpen ? 'content-panel--open' : 'content-panel--closed'}`} style={panelStyle}>
             <button className="close-btn" onClick={onClose}>✕</button>
             <div
                 style={{

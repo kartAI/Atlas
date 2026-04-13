@@ -1,5 +1,5 @@
 import './App.css'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ContentPanel } from './components/ContentPanel.jsx';
@@ -21,6 +21,46 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [theme, setTheme] =useState(() => localStorage.getItem('theme') || 'dark');
   const [chatUser, setChatUser] = useState(null);
+
+  // Resizable content panel
+  const [panelWidth, setPanelWidth] = useState(null); // null = CSS default (40vw)
+  const [isPanelDragging, setIsPanelDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartWidthRef = useRef(0);
+
+  const handlePanelResizeMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    setIsPanelDragging(true);
+    dragStartXRef.current = e.clientX;
+    dragStartWidthRef.current = panelWidth ?? Math.round(window.innerWidth * 0.4);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!isDraggingRef.current) return;
+      const delta = e.clientX - dragStartXRef.current;
+      const maxWidth = Math.round(window.innerWidth * 0.65);
+      const newWidth = Math.max(320, Math.min(dragStartWidthRef.current + delta, maxWidth));
+      setPanelWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      setIsPanelDragging(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -120,7 +160,9 @@ function App() {
   }
 
   const handleSelect = (id) => {
-    setActivePanel(activePanel === id ? null : id);
+    const next = activePanel === id ? null : id;
+    if (!next) setPanelWidth(null); // reset width when panel closes
+    setActivePanel(next);
   };
 
   const [flyTarget, setFlyTarget] = useState(null);
@@ -140,6 +182,11 @@ function App() {
     setActivePanel('Chatbot');
   }
 
+  function handlePanelClose() {
+    setPanelWidth(null);
+    setActivePanel(null);
+  }
+
   return (
     <>
       <Header theme={theme} onToggleTheme={toggleTheme} user={chatUser} onLogout={handleHeaderLogout} onLogin={handleHeaderLogin} />
@@ -153,7 +200,7 @@ function App() {
         />
         <ContentPanel 
           activePanel={activePanel} 
-          onClose={() => setActivePanel(null)}
+          onClose={handlePanelClose}
           layers={layers}
           onToggleLayer={toggleLayer}
           drawnLayers={drawnLayers}
@@ -162,7 +209,16 @@ function App() {
           onRemoveDrawnLayer={removeDrawnLayer}
           onFlyToLayer={setFlyTarget}
           chatUser={chatUser}
-          onUserChange={setChatUser} />
+          onUserChange={setChatUser}
+          panelWidth={panelWidth} />
+
+        {activePanel && (
+          <div
+            className={`panel-resize-handle${isPanelDragging ? ' panel-resize-handle--active' : ''}`}
+            onMouseDown={handlePanelResizeMouseDown}
+            aria-hidden="true"
+          />
+        )}
 
         <main className="map-stage">
           <Map
