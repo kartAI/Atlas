@@ -81,9 +81,6 @@ _DELOMRADE_RE = re.compile(
     re.UNICODE,
 )
 
-# Table heuristic: lines containing multiple tabs or pipe characters
-_TABLE_LINE_RE = re.compile(r'(\t.*\t|\|.*\|)', re.MULTILINE)
-
 # ---------------------------------------------------------------------------
 # Known Norwegian KU section keywords (lowercase, exact or prefix match)
 # ---------------------------------------------------------------------------
