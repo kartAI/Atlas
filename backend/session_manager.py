@@ -199,23 +199,44 @@ class SessionManager:
         )
         return "".join(lines)
 
-    async def send_message(self, session, message: str, map_context=None, chat_id: str = "") -> dict:
+    async def send_message(self, session, message: str, map_context=None, chat_id: str = "", tool_hints: list[str] | None = None) -> dict:
         """
         Send *message* to an active Copilot *session* and return a dict with
         the reply content and any pending map actions.
 
+        If *tool_hints* is provided (list of validated MCP tool identifiers such as
+        ``"vector-buffer"``), a directive block is prepended so the model
+        prioritises those tools when answering.
+
         Callers are responsible for persisting messages to the database.
         """
+        parts = []
+        if chat_id:
+            parts.append(f"[SESSION_ID: {chat_id}]")
+
+        if tool_hints:
+            hint_list = "\n".join(f"- {tool_name}" for tool_name in tool_hints)
+            parts.append(
+                f"[TOOL HINTS]\n"
+                f"The user has explicitly selected the following tools for this request:\n{hint_list}\n"
+                f"You SHOULD use these tools when answering. Prioritise them over other tools.\n"
+                f"[/TOOL HINTS]"
+            )
+
         if map_context:
             layer_summary = "\n".join(
                 f"- {l.get('name', 'Unnamed')} ({l.get('shape', '?')}): {json.dumps(l.get('geoJson'))}"
                 for l in map_context
             )
-            full_message = f"[SESSION_ID: {chat_id}]\n[CURRENT MAP STATE]\n{layer_summary}\n\n[USER MESSAGE]\n{message}"
-        elif chat_id:
-            full_message = f"[SESSION_ID: {chat_id}]\n\n[USER MESSAGE]\n{message}"
-        else:
-            full_message = message
+            parts.append(f"[CURRENT MAP STATE]\n{layer_summary}")
+
+        parts.append(f"[USER MESSAGE]\n{message}")
+        full_message = "\n\n".join(parts)
+
+        # Refresh activity timestamp so cleanup_expired() doesn't reap the
+        # session while a long send_and_wait() is in-flight.
+        if chat_id and chat_id in self.last_active:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
 
         try:
             response = await session.send_and_wait(full_message, timeout=900)
@@ -234,6 +255,10 @@ class SessionManager:
                     chat_id,
                 )
             raise
+
+        # Refresh again after the (potentially long) call completes.
+        if chat_id and chat_id in self.last_active:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
 
         content = response.data.content
         map_actions = get_and_clear_shapes(chat_id)

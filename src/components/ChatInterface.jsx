@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowUp, Paperclip, FileText, X, Plus } from 'lucide-react';
+import { ArrowUp, Paperclip, FileText, X, Plus, Wrench } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -15,7 +15,7 @@ import {
   setActiveChatId,
 } from '../utils/auth';
 
-export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], onLayerCreated }) {
+export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], onLayerCreated, selectedTools = [], onClearSelectedTools, onRemoveTool }) {
   // Auth state
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -234,10 +234,12 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     if (!trimmed && attachments.length === 0) return;
     if (isLoading) return;
 
-    const userMessage = { role: 'user', text: trimmed, attachments: [...attachments] };
+    const sentTools = [...selectedTools];
+    const userMessage = { role: 'user', text: trimmed, attachments: [...attachments], tools: sentTools };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setAttachments([]);
+    onClearSelectedTools?.();
     setIsLoading(true);
 
     try {
@@ -247,6 +249,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
           message: trimmed,
           chat_id: activeChatId || undefined,
           map_context: drawnLayers,
+          tool_hints: sentTools.map(t => t.mcpTool),
         }),
       });
 
@@ -397,11 +400,12 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
               messages.map((msg, i) => {
                 const images = msg.attachments?.filter(att => att.preview) || [];
                 const files  = msg.attachments?.filter(att => !att.preview) || [];
+                const tools  = msg.tools || [];
                 const hasText = !!msg.text;
 
                 return (
                   <div key={i} className={`message-wrapper message-wrapper--${msg.role}`}>
-                    {(images.length > 0 || files.length > 0) && (
+                    {(images.length > 0 || files.length > 0 || tools.length > 0) && (
                       <div className="message-attachments-wrapper">
                         {images.length > 0 && (
                           <div className={`message-image-attachments ${hasText || images.length > 1 ? 'message-image-attachments--preview' : ''}`}>
@@ -418,6 +422,16 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                               <div key={att.id} className="attachment-card">
                                 <div className="attachment-file-icon"><FileText size={26} /></div>
                                 <span className="attachment-file-name">{att.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {tools.length > 0 && (
+                          <div className="message-tool-attachments">
+                            {tools.map(tool => (
+                              <div key={tool.name} className="tool-chip tool-chip--sent">
+                                <Wrench size={13} />
+                                <span>{tool.name}</span>
                               </div>
                             ))}
                           </div>
@@ -452,8 +466,25 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
             <div ref={bottomRef} />
           </div>
 
-          {attachments.length > 0 && (
+          {(attachments.length > 0 || selectedTools.length > 0) && (
             <div className="attachment-preview-strip">
+              {selectedTools.map(tool => {
+                const Icon = tool.icon;
+                return (
+                  <div key={`tool-${tool.name}`} className="attachment-card attachment-card--tool">
+                    <button className="attachment-remove" onClick={() => onRemoveTool?.(tool)}>
+                      <X size={14} />
+                    </button>
+                    <div className="attachment-tool-icon">
+                      {typeof Icon === 'function' ? <Icon size={26} strokeWidth={1.8} /> : <Wrench size={26} />}
+                    </div>
+                    <div className="attachment-info">
+                      <span className="attachment-name">{tool.name}</span>
+                      <span className="attachment-size">Verktøy</span>
+                    </div>
+                  </div>
+                );
+              })}
               {attachments.map(att => (
                 <div key={att.id} className="attachment-card">
                   <button className="attachment-remove" onClick={() => removeAttachment(att.id)}>

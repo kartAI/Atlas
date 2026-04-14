@@ -608,6 +608,9 @@ async def query_database(sql: str) -> str:
     queries against approved Atlas data tables are permitted. Results are capped to
     200 rows and run with a statement timeout.
 
+    Call list_tables first to discover which tables are available, then
+    describe_table to see the exact column names before writing SQL.
+
     Args:
         sql: A single read-only SELECT query. WITH ... SELECT is supported.
     """

@@ -1,0 +1,166 @@
+{
+  "tools": [
+    {
+      "name": "Buffer",
+      "icon": "Circle",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Lag en buffersone rundt en geometri - f.eks. 500 m radius for nærhetanalyser",
+      "mcpTool": "vector-buffer",
+      "featured": true
+    },
+    {
+      "name": "Snitt",
+      "icon": "SquaresIntersect",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Finn det overlappende arealet mellom to geometrier",
+      "mcpTool": "vector-intersection",
+      "featured": true
+    },
+    {
+      "name": "Omsluttende rektangel",
+      "icon": "SquareDot",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Beregn bounding box (minste omsluttende rektangel) til en geometri",
+      "mcpTool": "vector-envelope",
+      "featured": false
+    },
+    {
+      "name": "Hent koordinater",
+      "icon": "Globe",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Trekk ut koordinatpar (lon/lat) fra en geometri",
+      "mcpTool": "vector-get_coordinates",
+      "featured": false
+    },
+    {
+      "name": "Punkt i polygon",
+      "icon": "CircleDot",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Sjekk hvilke punkter som faller innenfor et polygon - f.eks. om lokasjoner er innenfor en vernesone",
+      "mcpTool": "vector-point_in_polygon",
+      "featured": false
+    },
+    {
+      "name": "Voronoi",
+      "icon": "LayoutGrid",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Generer Voronoi-diagram fra punkter - deler kartet i innflytelsessoner per punkt",
+      "mcpTool": "vector-voronoi",
+      "featured": true
+    },
+    {
+      "name": "Verdensarv",
+      "icon": "Church",
+      "server": "vector",
+      "category": "Vektor",
+      "desc": "Hent alle norske verdensarvsteder med beskrivelse og geometri",
+      "mcpTool": "vector-get_verdensarv_sites",
+      "featured": false
+    },
+    {
+      "name": "Kulturmiljøsøk",
+      "icon": "MapPin",
+      "server": "geo",
+      "category": "Kulturmiljø",
+      "desc": "Finn kulturmiljøer innenfor en gitt radius fra et punkt",
+      "mcpTool": "geo-buffer_search",
+      "featured": true
+    },
+    {
+      "name": "Kommuner",
+      "icon": "Landmark",
+      "server": "geo",
+      "category": "Kulturmiljø",
+      "desc": "List kommunenummer og kommunenavn - kan filtreres med søkeord",
+      "mcpTool": "geo-list_kommuner",
+      "featured": false
+    },
+    {
+      "name": "Vernetyper",
+      "icon": "ShieldCheck",
+      "server": "geo",
+      "category": "Kulturmiljø",
+      "desc": "List alle vernetyper for kulturmiljøer",
+      "mcpTool": "geo-list_vernetyper",
+      "featured": false
+    },
+    {
+      "name": "Fulltekstsøk",
+      "icon": "Search",
+      "server": "search",
+      "category": "Dokumentsøk",
+      "desc": "Søk i dokumenter med norsk fulltekstsøk rangert etter relevans",
+      "mcpTool": "search-search_documents",
+      "featured": false
+    },
+    {
+      "name": "Fuzzy-søk",
+      "icon": "TextSearch",
+      "server": "search",
+      "category": "Dokumentsøk",
+      "desc": "Fuzzy-søk med trigram-likhet - finner treff selv med skrivefeil",
+      "mcpTool": "search-search_documents_fuzzy",
+      "featured": false
+    },
+    {
+      "name": "Semantisk søk",
+      "icon": "Sparkles",
+      "server": "search",
+      "category": "Dokumentsøk",
+      "desc": "Søk med AI-embeddings - finner dokumenter med lignende betydning",
+      "mcpTool": "search-search_documents_semantic",
+      "featured": false
+    },
+    {
+      "name": "Hybridsøk",
+      "icon": "Blend",
+      "server": "search",
+      "category": "Dokumentsøk",
+      "desc": "Kombinert fulltekst + semantisk + fuzzy for bredest mulig dekning",
+      "mcpTool": "search-search_hybrid",
+      "featured": true
+    },
+    {
+      "name": "Indekseringsstatus",
+      "icon": "BarChart3",
+      "server": "search",
+      "category": "Dokumentsøk",
+      "desc": "Vis statusoversikt for dokumentindeksering (new, ready, failed)",
+      "mcpTool": "search-get_indexing_status",
+      "featured": false
+    },
+    {
+      "name": "List dokumenter",
+      "icon": "FolderSearch",
+      "server": "docs",
+      "category": "Dokumenter",
+      "desc": "List alle tilgjengelige PDF-dokumenter i Azure Blob Storage",
+      "mcpTool": "docs-list_documents",
+      "featured": false
+    },
+    {
+      "name": "Hent dokument",
+      "icon": "FileText",
+      "server": "docs",
+      "category": "Dokumenter",
+      "desc": "Hent og les tekstinnholdet fra et spesifikt PDF-dokument",
+      "mcpTool": "docs-fetch_document",
+      "featured": false
+    },
+    {
+      "name": "Tegn på kart",
+      "icon": "Paintbrush",
+      "server": "map",
+      "category": "Kart",
+      "desc": "Tegn former, punkter eller linjer direkte på kartet basert på analyseresultater",
+      "mcpTool": "map-draw_shape",
+      "featured": true
+    }
+  ]
+}
