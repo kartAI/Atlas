@@ -6,7 +6,7 @@ Mounts MCP servers alongside the existing REST API:
   /mcp/db/mcp      — Database tools  (list_tables, describe_table, get_schema_overview, explain_query, query_database)
   /mcp/geo/mcp     — Geo tools       (list_kommuner, list_vernetyper, buffer_search)
   /mcp/docs/mcp    — Document tools  (list_documents, fetch_document)
-  /mcp/vector/mcp  — Vector tools    (buffer, intersection, envelope, get_coordinates, point_in_polygon, get_verdensarv_sites)
+  /mcp/vector/mcp  — Vector tools    (buffer, intersection, envelope, get_coordinates, point_in_polygon, get_verdensarv_sites, voronoi)
   /mcp/map/mcp     — Map tools       (draw_shape)
   /mcp/search/mcp  — Search tools    (search_documents, search_documents_fuzzy, search_documents_semantic, search_hybrid, index_*, get_indexing_status)
 
@@ -48,6 +48,7 @@ from copilot import CopilotClient
 from session_manager import SessionManager
 from usage_tracker import get_or_create_tracker, get_tracker
 from db import init_db_pool, close_pool, execute, execute_transaction, query
+from tool_catalog import normalize_tool_hints
 from auth_routes import (
     get_user_from_request,
     login,
@@ -127,6 +128,7 @@ async def chat(request: Request):
     if not message:
         return JSONResponse({"error": "'message' is required."}, status_code=400)
     map_context = data.get("map_context")
+    tool_hints = normalize_tool_hints(data.get("tool_hints"))
 
     chat_id: str | None = data.get("chat_id")
     created_chat = not chat_id
@@ -181,7 +183,7 @@ async def chat(request: Request):
 
     # Send to Copilot
     try:
-        result = await manager.send_message(copilot_session, message, map_context=map_context, chat_id=chat_id)
+        result = await manager.send_message(copilot_session, message, map_context=map_context, chat_id=chat_id, tool_hints=tool_hints)
     except Exception as exc:
         # Finalise the turn even on error so partial data isn't lost.
         tracker.finalise_turn()
