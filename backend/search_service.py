@@ -47,6 +47,7 @@ async def search_full_text(search_query: str, limit: int = 10) -> list[dict]:
             ts_rank(search_vector, plainto_tsquery('norwegian', %(q)s)) AS score
         FROM documents
         WHERE search_vector @@ plainto_tsquery('norwegian', %(q)s)
+          AND indexing_status IN ('ready', 'partial')
         ORDER BY score DESC
         LIMIT %(lim)s;
         """,
@@ -60,19 +61,105 @@ async def search_semantic(search_query: str, limit: int = 10) -> list[dict]:
     """
     Semantic search using pgvector cosine distance.
 
-    Embeds the query text and finds the nearest documents by cosine similarity.
-    Returns empty if no embedding model is configured or no documents have embeddings.
+    Queries the chunks table first (per-chunk embeddings = higher precision).
+    Supplements with the documents table for any documents not already
+    represented in the chunk results (handles the migration window where
+    some documents have chunk embeddings and others only have a document-level
+    embedding).
+
+    Returns one result per unique document (best-matching chunk per document).
+    Each result includes heading_path, section_title, topic_type, and page_start
+    so the caller knows exactly which part of the document matched.
     """
     if not search_query or not search_query.strip():
         return []
 
-    # Generate embedding for the query text
     query_embedding = await _embed_text(search_query.strip())
     if query_embedding is None:
         logger.info("search_semantic: ingen embedding-modell konfigurert — hopper over")
         return []
 
-    # Cosine similarity = 1 - cosine distance (<=> operator)
+    # Chunk-level semantic search (higher precision)
+    chunk_results = await _search_semantic_chunks(query_embedding, search_query.strip(), limit)
+
+    # Document-level fallback — always run so un-chunked documents are covered
+    doc_results = await _search_semantic_documents(query_embedding, search_query.strip(), limit)
+
+    if not chunk_results:
+        return doc_results
+    if not doc_results:
+        return chunk_results
+
+    # Merge: supplement chunk results with document-level hits for docs not
+    # already represented, so partially-migrated corpora don't lose coverage.
+    covered_ids = {r["id"] for r in chunk_results}
+    merged = list(chunk_results)
+    for doc in doc_results:
+        if doc["id"] not in covered_ids:
+            merged.append(doc)
+
+    merged.sort(key=lambda d: d.get("score", 0), reverse=True)
+    return merged[:limit]
+
+
+async def _search_semantic_chunks(
+    query_embedding: list[float],
+    search_query:    str,
+    limit:           int,
+) -> list[dict]:
+    """
+    Find the best-matching chunk per document using pgvector cosine similarity.
+
+    Uses DISTINCT ON (document_id) ordered by cosine distance so each document
+    contributes at most one result — the chunk most relevant to the query.
+    The outer query re-sorts by score descending and applies the final limit.
+
+    Returns chunk-level content (full chunk text, not truncated) with metadata.
+    """
+    rows = await query(
+        """
+        SELECT *
+        FROM (
+            SELECT DISTINCT ON (d.id)
+                d.id                                              AS id,
+                d.title,
+                c.text                                            AS content,
+                c.heading_path,
+                c.section_title,
+                c.topic_type,
+                c.alternative,
+                c.delomrade,
+                c.contains_table,
+                c.page_start,
+                c.page_end,
+                c.chunk_index,
+                c.id                                              AS chunk_id,
+                1 - (c.embedding <=> %(emb)s::vector)             AS score
+            FROM chunks c
+            JOIN documents d ON c.document_id = d.id
+            WHERE c.embedding IS NOT NULL
+              AND d.indexing_status IN ('ready', 'partial')
+            ORDER BY d.id, c.embedding <=> %(emb)s::vector
+        ) best_per_doc
+        ORDER BY score DESC
+        LIMIT %(lim)s;
+        """,
+        {"emb": json.dumps(query_embedding), "lim": limit},
+    )
+    logger.info("search_semantic (chunks): query='%s' → %d treff", search_query, len(rows))
+    # Return full chunk text — do not truncate via _with_snippets
+    return [dict(r) for r in rows]
+
+
+async def _search_semantic_documents(
+    query_embedding: list[float],
+    search_query:    str,
+    limit:           int,
+) -> list[dict]:
+    """
+    Fallback: document-level cosine similarity search on documents.embedding.
+    Used when the chunks table has no embeddings yet.
+    """
     rows = await query(
         """
         SELECT
@@ -82,13 +169,14 @@ async def search_semantic(search_query: str, limit: int = 10) -> list[dict]:
             1 - (embedding <=> %(emb)s::vector) AS score
         FROM documents
         WHERE embedding IS NOT NULL
+          AND indexing_status IN ('ready', 'partial')
         ORDER BY embedding <=> %(emb)s::vector
         LIMIT %(lim)s;
         """,
         {"emb": json.dumps(query_embedding), "lim": limit},
     )
-    logger.info("search_semantic: query='%s' → %d treff", search_query.strip(), len(rows))
-    return _with_snippets(rows)
+    logger.info("search_semantic (documents fallback): query='%s' → %d treff", search_query, len(rows))
+    return _with_snippets([dict(r) for r in rows])
 
 
 async def search_fuzzy(search_query: str, limit: int = 10) -> list[dict]:
@@ -113,8 +201,9 @@ async def search_fuzzy(search_query: str, limit: int = 10) -> list[dict]:
                 word_similarity(%(q)s, content)
             ) AS score
         FROM documents
-        WHERE similarity(title, %(q)s) > 0.1
-           OR word_similarity(%(q)s, content) > 0.1
+        WHERE (similarity(title, %(q)s) > 0.1
+           OR word_similarity(%(q)s, content) > 0.1)
+          AND indexing_status IN ('ready', 'partial')
         ORDER BY score DESC
         LIMIT %(lim)s;
         """,
