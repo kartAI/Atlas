@@ -1,21 +1,6 @@
 """
 Structure-aware chunking for Norwegian KU (consequence assessment) documents.
 
-Overview
---------
-chunk_document(blocks, document_name, source_blob) -> list[dict]
-
-Input:  A list of text blocks produced by config.fetch_document_blocks().
-        Each block: {"text": str, "page": int, "font_size": float, "is_bold": bool}
-
-Output: A list of chunk dicts, each containing:
-        - local_id          int       sequential ID (used to resolve parent relationships)
-        - local_parent_id   int|None  local_id of the parent chunk, or None for top-level
-        - chunk_index       int       order within the document
-        - text              str       chunk content (may include heading prefix for context)
-        - char_count        int
-        - metadata          dict      all metadata fields (see _build_metadata)
-
 Chunking strategy (two-level)
 ------------------------------
 1. Detect section boundaries via heading detection (font size + bold + numbered
@@ -168,9 +153,9 @@ def blocks_to_text(blocks: list[dict]) -> str:
     Used to populate documents.content for full-text and fuzzy search.
     """
     return "\n\n".join(
-        b.get("text", "").strip()
-        for b in blocks
-        if b.get("text", "").strip()
+        block.get("text", "").strip()
+        for block in blocks
+        if block.get("text", "").strip()
     )
 
 
@@ -186,9 +171,9 @@ def _detect_body_font_size(blocks: list[dict]) -> float:
     """
     from collections import Counter
     sizes = [
-        round(b.get("font_size", 0))
-        for b in blocks
-        if b.get("font_size", 0) > 0
+        round(block.get("font_size", 0))
+        for block in blocks
+        if block.get("font_size", 0) > 0
     ]
     if not sizes:
         return 11.0
@@ -201,11 +186,11 @@ def _parse_numbered_heading(text: str) -> Optional[tuple[str, str, int]]:
     Example: "5.1 Alternativ 1" → ("5.1", "Alternativ 1", 2)
     Returns None if text is not a numbered heading.
     """
-    m = _NUMBERED_SECTION_RE.match(text.strip())
-    if not m:
+    n_match = _NUMBERED_SECTION_RE.match(text.strip())
+    if not n_match:
         return None
-    number = m.group(1)
-    title  = m.group(2).strip()
+    number = n_match.group(1)
+    title  = n_match.group(2).strip()
     depth  = number.count(".") + 1
     return (number, title, depth)
 
@@ -216,8 +201,8 @@ def _is_known_ku_keyword(text: str) -> bool:
     if lower in _KU_SECTION_KEYWORDS:
         return True
     # Allow "keyword: ..." or "keyword — ..." prefix forms
-    for kw in _KU_SECTION_KEYWORDS:
-        if lower.startswith(kw) and len(lower) < len(kw) + 40:
+    for keyword in _KU_SECTION_KEYWORDS:
+        if lower.startswith(keyword) and len(lower) < len(keyword) + 40:
             return True
     return False
 
@@ -318,7 +303,7 @@ def _classify_topic(heading_path: str, section_title: str) -> str:
     """
     haystack = (heading_path + " " + section_title).lower()
     for keywords, topic in _TOPIC_RULES:
-        if any(kw in haystack for kw in keywords):
+        if any(keyword in haystack for keyword in keywords):
             return topic
     return "other"
 
@@ -328,9 +313,9 @@ def _detect_alternative(text: str) -> Optional[str]:
     Detect alternative references in heading text (nullalternativ, alternativ 1 …).
     Returns the normalised match or None.
     """
-    m = _ALTERNATIVE_RE.search(text)
-    if m:
-        return re.sub(r'\s+', ' ', m.group(1).lower())
+    alt_match = _ALTERNATIVE_RE.search(text)
+    if alt_match:
+        return re.sub(r'\s+', ' ', alt_match.group(1).lower())
     return None
 
 
@@ -339,9 +324,9 @@ def _detect_delomrade(text: str) -> Optional[str]:
     Detect area codes (delområde) like N01, ØFA1, S03 in a heading or path.
     Returns the first match or None.
     """
-    m = _DELOMRADE_RE.search(text)
-    if m:
-        return m.group(1)
+    delomrade_match = _DELOMRADE_RE.search(text)
+    if delomrade_match:
+        return delomrade_match.group(1)
     return None
 
 
@@ -460,8 +445,8 @@ def _detect_sections(blocks: list[dict], body_font_size: float) -> list[dict]:
 
     # Evaluate whether structure detection was successful
     named_sections = [
-        s for s in sections
-        if s["heading_number"] or s["heading_title"] not in ("Preamble", "")
+        section for section in sections
+        if section["heading_number"] or section["heading_title"] not in ("Preamble", "")
     ]
     if len(named_sections) < MIN_HEADINGS_FOR_STRUCTURE:
         logger.warning(
@@ -549,7 +534,7 @@ def _group_paragraphs_into_children(
         group_text = (overlap_prefix + "\n\n" + joined) if (overlap_prefix and groups) else joined
         groups.append(group_text.strip())
 
-    return [g for g in groups if g.strip()]
+    return [group for group in groups if group.strip()]
 
 
 # ===========================================================================
@@ -587,9 +572,9 @@ def _structure_based_chunks(
 
         # Build body text from all content blocks in this section
         body_text = "\n\n".join(
-            b.get("text", "").strip()
-            for b in section["blocks"]
-            if b.get("text", "").strip()
+            block.get("text", "").strip()
+            for block in section["blocks"]
+            if block.get("text", "").strip()
         )
 
         # A section with a heading but no body text still produces a chunk
@@ -706,15 +691,15 @@ def _fallback_paragraph_chunks(
         overlap_chars = CHILD_OVERLAP_CHARS,
     )
 
-    total_pages = max((b.get("page", 1) for b in blocks), default=1)
+    total_pages = max((block.get("page", 1) for block in blocks), default=1)
     chunks: list[dict] = []
 
-    for i, group_text in enumerate(groups):
+    for chunk_idx, group_text in enumerate(groups):
         # Rough page estimate: spread chunks evenly from page 1 to total_pages
         if len(groups) <= 1:
             page_est = 1
         else:
-            page_est = max(1, round(1 + i * (total_pages - 1) / (len(groups) - 1)))
+            page_est = max(1, round(1 + chunk_idx * (total_pages - 1) / (len(groups) - 1)))
         meta = _build_metadata(
             document_name  = document_name,
             source_blob    = source_blob,
@@ -730,9 +715,9 @@ def _fallback_paragraph_chunks(
             page_end       = page_est,
         )
         chunks.append({
-            "local_id":        i,
+            "local_id":        chunk_idx,
             "local_parent_id": None,
-            "chunk_index":     i,
+            "chunk_index":     chunk_idx,
             "text":            group_text,
             "char_count":      len(group_text),
             "metadata":        meta,
