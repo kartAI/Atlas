@@ -320,7 +320,7 @@
 
 .chat-input-area {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
   padding: 0.75rem;
   border-top: 0.1px solid var(--border);
@@ -337,11 +337,25 @@
   font-family: inherit;
   font-size: 0.9rem;
   background: var(--text-input-area);
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, border-radius 0.25s ease;
+  min-height: 36px;
+  max-height: 250px;
+  overflow-y: hidden;
+  line-height: 1.5;
+  box-sizing: border-box;
+  display: block;
 }
 
 .chat-input-area textarea:focus {
   border-color: var(--primary-color);
+}
+
+/* Send / attachment buttons stay pinned to bottom of input area */
+.chat-input-area .paperclip,
+.chat-input-area > button {
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin-bottom: 0;
 }
 
 .chat-input-area button {
@@ -507,6 +521,46 @@
 .leaflet-control-zoom a.leaflet-disabled {
   color: var(--soft-bg) !important;
   cursor: not-allowed !important;
+}
+
+/* ─── Panel resize handle ───────────────────────────────────── */
+.panel-resize-handle {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--border);
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s;
+  animation: panelHandleFadeIn 0.25s ease forwards;
+}
+
+.panel-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 36px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.panel-resize-handle:hover::after,
+.panel-resize-handle--active::after {
+  background: var(--primary-color);
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle--active {
+  background: rgba(38, 190, 118, 0.18);
+}
+
+@keyframes panelHandleFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Map Layers Overlay */

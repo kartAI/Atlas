@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { ArrowUp, Paperclip, FileText, X, Plus, Wrench } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -35,6 +35,20 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   const [attachments, setAttachments] = useState([]);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  const MAX_TEXTAREA_HEIGHT = 250; // ~5 rows
+
+  // Auto-resize textarea as user types
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const newHeight = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    el.style.height = `${newHeight}px`;
+    el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden';
+    el.style.borderRadius = newHeight > 44 ? '14px' : '999px';
+  }, [input]);
 
   // Usage tracking state
   const [usageSession, setUsageSession] = useState(null);
@@ -504,6 +518,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
               />
             </div>
             <textarea
+              ref={textareaRef}
               rows={1}
               value={input}
               onChange={e => setInput(e.target.value)}
