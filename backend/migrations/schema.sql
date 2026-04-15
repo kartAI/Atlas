@@ -80,7 +80,9 @@ CREATE TRIGGER trg_documents_search_vector
 -- ============================================================================
 -- Each document may have zero or more chunks produced by chunker.py.
 -- Semantic search queries chunk embeddings for higher retrieval precision.
--- See migrations/007_create_chunks_table.sql for the full comment block.
+--
+-- CANONICAL DEFINITION: migrations/007_create_chunks_table.sql
+-- Keep this copy in sync with the migration file above.
 
 CREATE TABLE IF NOT EXISTS chunks (
     id               SERIAL PRIMARY KEY,
@@ -105,7 +107,7 @@ CREATE TABLE IF NOT EXISTS chunks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chunks_document_id
-    ON chunks (document_id);
+    ON chunks (document_id, chunk_index);
 
 CREATE INDEX IF NOT EXISTS idx_chunks_parent_chunk_id
     ON chunks (parent_chunk_id);

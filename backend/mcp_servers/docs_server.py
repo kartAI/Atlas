@@ -9,7 +9,8 @@ import json
 import logging
 
 from fastmcp import FastMCP
-from config import list_documents as _list_documents, fetch_document as _fetch_document
+from blob_storage import list_documents as _list_documents
+from pdf_extractor import fetch_document as _fetch_document
 
 logger = logging.getLogger(__name__)
 

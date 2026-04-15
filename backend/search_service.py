@@ -17,6 +17,8 @@ from db import query
 logger = logging.getLogger(__name__)
 
 _SNIPPET_LENGTH = 300
+_SEMANTIC_CHUNK_CANDIDATE_MULTIPLIER = 8
+_SEMANTIC_CHUNK_MIN_CANDIDATES = 100
 
 
 def _with_snippets(rows) -> list[dict]:
@@ -110,19 +112,23 @@ async def _search_semantic_chunks(
     """
     Find the best-matching chunk per document using pgvector cosine similarity.
 
-    Uses DISTINCT ON (document_id) ordered by cosine distance so each document
-    contributes at most one result — the chunk most relevant to the query.
-    The outer query re-sorts by score descending and applies the final limit.
+    Fetches a limited nearest-neighbour candidate set first so PostgreSQL can
+    use the pgvector HNSW index on chunks.embedding, then de-duplicates that
+    candidate set down to the best chunk per document.
 
-    Returns chunk-level content (full chunk text, not truncated) with metadata.
+    Returns chunk-level content with the same snippet-length content contract
+    used by the other search backends.
     """
+    candidate_limit = max(
+        limit * _SEMANTIC_CHUNK_CANDIDATE_MULTIPLIER,
+        _SEMANTIC_CHUNK_MIN_CANDIDATES,
+    )
     rows = await query(
         """
-        SELECT *
-        FROM (
-            SELECT DISTINCT ON (d.id)
-                d.id                                              AS id,
-                d.title,
+        WITH nearest_chunks AS (
+            SELECT
+                d.id                                              AS document_id,
+                d.title                                           AS document_title,
                 c.text                                            AS content,
                 c.heading_path,
                 c.section_title,
@@ -136,19 +142,42 @@ async def _search_semantic_chunks(
                 c.id                                              AS chunk_id,
                 1 - (c.embedding <=> %(emb)s::vector)             AS score
             FROM chunks c
-            JOIN documents d ON c.document_id = d.id
+            JOIN documents d ON d.id = c.document_id
             WHERE c.embedding IS NOT NULL
               AND d.indexing_status IN ('ready', 'partial')
-            ORDER BY d.id, c.embedding <=> %(emb)s::vector
+            ORDER BY c.embedding <=> %(emb)s::vector
+            LIMIT %(candidate_lim)s
+        )
+        SELECT *
+        FROM (
+            SELECT DISTINCT ON (nc.document_id)
+                nc.document_id                                    AS id,
+                nc.document_title                                 AS title,
+                nc.content,
+                nc.heading_path,
+                nc.section_title,
+                nc.topic_type,
+                nc.alternative,
+                nc.delomrade,
+                nc.contains_table,
+                nc.page_start,
+                nc.page_end,
+                nc.chunk_index,
+                nc.chunk_id,
+                nc.score
+            FROM nearest_chunks nc
+            ORDER BY nc.document_id, nc.score DESC
         ) best_per_doc
         ORDER BY score DESC
         LIMIT %(lim)s;
         """,
-        {"emb": json.dumps(query_embedding), "lim": limit},
+        {"emb": json.dumps(query_embedding), "lim": limit, "candidate_lim": candidate_limit},
     )
-    logger.info("search_semantic (chunks): query='%s' → %d treff", search_query, len(rows))
-    # Return full chunk text — do not truncate via _with_snippets
-    return [dict(r) for r in rows]
+    logger.info(
+        "search_semantic (chunks): query='%s' → %d treff from %d candidates",
+        search_query, len(rows), candidate_limit,
+    )
+    return _with_snippets(rows)
 
 
 async def _search_semantic_documents(
@@ -261,6 +290,45 @@ async def hybrid_search(search_query: str, limit: int = 10) -> list[dict]:
         sum(1 for d in results if d.get("source") == "fuzzy"),
     )
     return results[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Chunk retrieval helper
+# ---------------------------------------------------------------------------
+
+async def get_chunk_by_id(chunk_id: int) -> dict | None:
+    """
+    Fetch the full text and metadata for a single chunk by its primary key.
+
+    Semantic search returns truncated content (300 chars) together with the
+    chunk_id. Use this function to retrieve the complete chunk when the full
+    text is needed (e.g. before passing it to an LLM for answer generation).
+
+    Returns None if the chunk does not exist.
+    """
+    rows = await query(
+        """
+        SELECT
+            c.id            AS chunk_id,
+            c.document_id,
+            d.title         AS document_title,
+            c.text          AS content,
+            c.heading_path,
+            c.section_title,
+            c.topic_type,
+            c.alternative,
+            c.delomrade,
+            c.contains_table,
+            c.page_start,
+            c.page_end,
+            c.chunk_index
+        FROM chunks c
+        JOIN documents d ON d.id = c.document_id
+        WHERE c.id = %(chunk_id)s;
+        """,
+        {"chunk_id": chunk_id},
+    )
+    return rows[0] if rows else None
 
 
 # ---------------------------------------------------------------------------
