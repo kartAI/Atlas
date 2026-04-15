@@ -283,14 +283,20 @@ class SessionManager:
                 )
                 idle_event.set()
 
+        _STREAM_TIMEOUT = 900  # seconds — matches send_and_wait timeout
+
         unsubscribe = session.on(handler)
         try:
             await session.send(full_message)
 
             # Yield events as they arrive until the session goes idle.
+            deadline = asyncio.get_event_loop().time() + _STREAM_TIMEOUT
             while not idle_event.is_set():
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    raise TimeoutError(f"Streaming timed out after {_STREAM_TIMEOUT}s")
                 try:
-                    item = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    item = await asyncio.wait_for(queue.get(), timeout=min(1.0, remaining))
                     yield item
                 except asyncio.TimeoutError:
                     continue

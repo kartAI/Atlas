@@ -18,21 +18,35 @@ import {
 function ThinkingBlock({ thinking, isStreaming }) {
   const [expanded, setExpanded] = useState(isStreaming);
   const contentRef = useRef(null);
+  const userScrolledUp = useRef(false);
 
   // Auto-expand while streaming, allow manual toggle after
   useEffect(() => {
-    if (isStreaming) setExpanded(true);
+    if (isStreaming) {
+      setExpanded(true);
+      userScrolledUp.current = false;
+    }
   }, [isStreaming]);
 
-  // Auto-scroll to bottom as thinking text streams in.
-  // useLayoutEffect fires synchronously after DOM mutations (before paint),
-  // ensuring scrollHeight reflects the new text content.
+  // Detect if user has manually scrolled up (stop auto-scroll if so)
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    function onScroll() {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+      userScrolledUp.current = !atBottom;
+    }
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [expanded]); // re-attach when expanded toggles (el mounts/unmounts)
+
+  // Auto-scroll to bottom as thinking text streams in, unless user scrolled up.
   useLayoutEffect(() => {
     const el = contentRef.current;
-    if (isStreaming && expanded && el) {
+    if (expanded && el && !userScrolledUp.current) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [thinking, isStreaming, expanded]);
+  }, [thinking, expanded]);
 
   if (!thinking) return null;
 
@@ -314,6 +328,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let eventType = null; // persists across reads so cross-chunk events aren't lost
 
       while (true) {
         const { done, value } = await reader.read();
@@ -323,12 +338,17 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
         const lines = buffer.split('\n');
         buffer = lines.pop(); // keep incomplete line in buffer
 
-        let eventType = null;
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             eventType = line.slice(7).trim();
           } else if (line.startsWith('data: ') && eventType) {
-            const payload = JSON.parse(line.slice(6));
+            let payload;
+            try {
+              payload = JSON.parse(line.slice(6));
+            } catch {
+              eventType = null;
+              continue;
+            }
 
             if (eventType === 'meta' && payload.chat_id) {
               if (!activeChatId) {

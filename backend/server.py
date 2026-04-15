@@ -129,7 +129,7 @@ async def chat(request: Request):
         return JSONResponse({"error": "'message' is required."}, status_code=400)
     map_context = data.get("map_context")
     tool_hints = normalize_tool_hints(data.get("tool_hints"))
-    stream = data.get("stream", False)
+    stream = data.get("stream") is True
 
     chat_id: str | None = data.get("chat_id")
     created_chat = not chat_id
