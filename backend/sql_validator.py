@@ -35,6 +35,13 @@ def _load_allowed_schemas() -> set[tuple[str, str]]:
 
 ALLOWED_TABLES: set[tuple[str, str]] = _load_allowed_schemas()
 
+_BLOCKED_FUNCTIONS = {"pg_sleep","pg_sleep_for","pg_sleep_until"}
+
+def _check_functions(stmt: exp.Select) -> None:
+    for node in stmt.find_all(exp.Func):
+        if node.sql_name().lower() in _BLOCKED_FUNCTIONS:
+            raise SQLValidationError(f"Function '{node.sql_name()}' is not permitted.")
+        
 # AST node types that indicate write / structural operations
 _FORBIDDEN_EXPRESSION_TYPES = (
     exp.Insert,
@@ -102,7 +109,10 @@ def validate_select_query(sql: str) -> str:
                 f"Forbidden operation detected inside query: {type(node).__name__}."
             )
 
-    # --- 5. Table allowlist check ---------------------------------------
+    # --- 5. Function allowlist check ---------------------------------------
+    _check_functions(stmt)
+
+    # --- 6. Table allowlist check ---------------------------------------
     _check_table_allowlist(stmt)
 
     # Return the canonical, dialect-normalised SQL
