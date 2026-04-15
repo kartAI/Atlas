@@ -21,6 +21,10 @@ MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "100"))
 MAX_HISTORY_PER_SESSION = int(os.getenv("MAX_HISTORY_PER_SESSION", "200"))
 DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("1", "true", "yes", "on")
 
+# SQL allowlist — comma-separated list of PostgreSQL schemas the agent may query.
+# Example: SQL_ALLOWED_SCHEMAS=public,your_gis_schema
+SQL_ALLOWED_SCHEMAS = os.getenv("SQL_ALLOWED_SCHEMAS", "")
+
 # Buffer search hardening
 BUFFER_DISTANCE_MIN_METERS = int(os.getenv("BUFFER_DISTANCE_MIN_METERS", "10"))
 BUFFER_DISTANCE_MAX_METERS = int(os.getenv("BUFFER_DISTANCE_MAX_METERS", "50000"))

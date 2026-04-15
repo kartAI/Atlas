@@ -8,11 +8,15 @@ Tools:
 """
 
 import json
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import re
 from typing import Any
 
 from fastmcp import FastMCP
 from db import get_connection, query
+from sql_validator import SQLValidationError, validate_select_query
 
 
 # Create the FastMCP server based on the FastMCP V2 framework.
@@ -614,15 +618,32 @@ async def query_database(sql: str) -> str:
     Args:
         sql: A single read-only SELECT query. WITH ... SELECT is supported.
     """
-    normalized_sql, validation_error = await _validate_query_sql(sql)
-    if validation_error:
-        return _json_error(validation_error)
-
+    # Layer 1 – SQLGlot AST validation (single SELECT, no DDL/DML, allowlist)
     try:
-        rows = await _run_query(_limit_query(normalized_sql))
+        safe_sql = validate_select_query(sql)
+    except SQLValidationError as exc:
+        return json.dumps({"error": f"Query rejected: {exc}"})
+
+    # Layer 2 – PostgreSQL READ ONLY transaction (DB-level backstop)
+    try:
+        limited_sql = (
+            "SELECT * "
+            f"FROM ({safe_sql}) AS atlas_query "
+            f"LIMIT {_QUERY_ROW_LIMIT}"
+        )
+        async with get_connection() as conn:
+            async with conn.transaction(force_rollback=True):
+                await conn.execute("SET TRANSACTION READ ONLY")
+                async with conn.cursor() as cur:
+                    timeout_value = f"{_QUERY_TIMEOUT_MS}ms"
+                    await cur.execute(f"SET LOCAL statement_timeout = '{timeout_value}'")
+                    await cur.execute(f"SET LOCAL lock_timeout = '{timeout_value}'")
+                    await cur.execute(limited_sql)
+                    if cur.description is None:
+                        return json.dumps([])
+                    rows = await cur.fetchall()
         return json.dumps(rows, indent=2, default=str)
     except Exception as exc:
-        error_msg = str(exc)
-        return _json_error(f"Query execution failed: {error_msg}{_error_hint(error_msg)}")
+        return json.dumps({"error": f"Query execution failed: {exc}"})
 
 db_app = mcp.http_app(path="/mcp")
