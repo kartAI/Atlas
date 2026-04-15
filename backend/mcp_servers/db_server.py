@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 from fastmcp import FastMCP
-from db import get_connection, get_connection, query
+from db import get_connection, query
 from sql_validator import SQLValidationError, validate_select_query
 
 
@@ -626,11 +626,21 @@ async def query_database(sql: str) -> str:
 
     # Layer 2 – PostgreSQL READ ONLY transaction (DB-level backstop)
     try:
+        limited_sql = (
+            "SELECT * "
+            f"FROM ({safe_sql}) AS atlas_query "
+            f"LIMIT {_QUERY_ROW_LIMIT}"
+        )
         async with get_connection() as conn:
-            async with conn.transaction():
+            async with conn.transaction(force_rollback=True):
                 await conn.execute("SET TRANSACTION READ ONLY")
                 async with conn.cursor() as cur:
-                    await cur.execute(safe_sql)
+                    timeout_value = f"{_QUERY_TIMEOUT_MS}ms"
+                    await cur.execute(f"SET LOCAL statement_timeout = '{timeout_value}'")
+                    await cur.execute(f"SET LOCAL lock_timeout = '{timeout_value}'")
+                    await cur.execute(limited_sql)
+                    if cur.description is None:
+                        return json.dumps([])
                     rows = await cur.fetchall()
         return json.dumps(rows, indent=2, default=str)
     except Exception as exc:

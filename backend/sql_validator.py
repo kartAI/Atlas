@@ -35,12 +35,45 @@ def _load_allowed_schemas() -> set[tuple[str, str]]:
 
 ALLOWED_TABLES: set[tuple[str, str]] = _load_allowed_schemas()
 
-_BLOCKED_FUNCTIONS = {"pg_sleep","pg_sleep_for","pg_sleep_until"}
+_BLOCKED_FUNCTIONS = {
+    # DoS / time-based
+    "pg_sleep", "pg_sleep_for", "pg_sleep_until",
+    # Filesystem access
+    "pg_read_file", "pg_read_binary_file", "pg_file_read",
+    "pg_file_write", "pg_file_rename", "pg_file_unlink",
+    "pg_ls_dir", "pg_ls_logdir", "pg_ls_waldir",
+    "pg_stat_file",
+    # Large-object file exfiltration
+    "lo_import", "lo_export", "lo_from_bytea", "lo_put",
+    # Remote connections
+    "dblink", "dblink_exec", "dblink_connect",
+    # Session/backend manipulation
+    "pg_terminate_backend", "pg_cancel_backend", "pg_reload_conf",
+    # Configuration manipulation
+    "set_config",
+    # Advisory locks (can be used for DoS)
+    "pg_advisory_lock", "pg_advisory_xact_lock",
+    # Query plan / extension loading
+    "pg_execute_server_program",
+}
+
+def _resolve_func_name(node: exp.Func) -> str:
+    """Extract the real function name from a SQLGlot Func node.
+
+    SQLGlot represents functions it doesn't recognise (most PostgreSQL builtins)
+    as ``Anonymous`` nodes whose ``sql_name()`` returns ``'ANONYMOUS'``.
+    The actual name is stored in ``node.this`` for Anonymous nodes.
+    """
+    if isinstance(node, exp.Anonymous):
+        return (node.this or "").lower()
+    return node.sql_name().lower()
+
 
 def _check_functions(stmt: exp.Select) -> None:
     for node in stmt.find_all(exp.Func):
-        if node.sql_name().lower() in _BLOCKED_FUNCTIONS:
-            raise SQLValidationError(f"Function '{node.sql_name()}' is not permitted.")
+        name = _resolve_func_name(node)
+        if name in _BLOCKED_FUNCTIONS:
+            raise SQLValidationError(f"Function '{name}' is not permitted.")
         
 # AST node types that indicate write / structural operations
 _FORBIDDEN_EXPRESSION_TYPES = (
