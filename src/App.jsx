@@ -190,7 +190,7 @@ function App() {
           method: 'POST',
           body: JSON.stringify({
             layer_id: info.id,
-            name: info.name,
+            name: info.name || 'Untitled layer',
             shape: info.shape || 'Feature',
             visible: info.visible !== false,
             geojson: info.geoJson,

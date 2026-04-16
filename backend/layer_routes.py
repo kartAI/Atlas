@@ -15,24 +15,34 @@ Security rules:
 
 import json
 import logging
+import uuid as _uuid
 from datetime import datetime
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from auth_routes import get_user_from_request
-from db import execute, query
+from db import execute, execute_transaction, query
 
 logger = logging.getLogger(__name__)
 
 _MAX_LAYER_ID_LENGTH = 100
 _MAX_NAME_LENGTH = 200
+_MAX_SHAPE_LENGTH = 50
 _MAX_GEOJSON_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _is_valid_uuid(value: str) -> bool:
+    try:
+        _uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError):
+        return False
+
 
 def _serialize_rows(rows: list) -> list:
     result = []
@@ -74,6 +84,8 @@ def _validate_layer(data: dict) -> str | None:
         return f"'name' exceeds {_MAX_NAME_LENGTH} characters."
     if not shape or not isinstance(shape, str):
         return "'shape' is required."
+    if len(shape) > _MAX_SHAPE_LENGTH:
+        return f"'shape' exceeds {_MAX_SHAPE_LENGTH} characters."
     if not geojson or not isinstance(geojson, dict):
         return "'geojson' must be a non-empty object."
     if len(json.dumps(geojson)) > _MAX_GEOJSON_BYTES:
@@ -91,6 +103,8 @@ async def list_layers(request: Request):
         return JSONResponse({"error": "Not authenticated."}, status_code=401)
 
     chat_id = request.path_params["chat_id"]
+    if not _is_valid_uuid(chat_id):
+        return JSONResponse({"error": "Invalid chat ID."}, status_code=400)
     user_id = str(user["id"])
 
     if not await _assert_chat_owner(chat_id, user_id):
@@ -114,6 +128,8 @@ async def upsert_layer(request: Request):
         return JSONResponse({"error": "Not authenticated."}, status_code=401)
 
     chat_id = request.path_params["chat_id"]
+    if not _is_valid_uuid(chat_id):
+        return JSONResponse({"error": "Invalid chat ID."}, status_code=400)
     user_id = str(user["id"])
 
     if not await _assert_chat_owner(chat_id, user_id):
@@ -145,7 +161,7 @@ async def upsert_layer(request: Request):
             chat_id,
             data["layer_id"][:_MAX_LAYER_ID_LENGTH],
             data["name"][:_MAX_NAME_LENGTH],
-            data["shape"],
+            data["shape"][:_MAX_SHAPE_LENGTH],
             visible,
             json.dumps(data["geojson"]),
         ),
@@ -159,6 +175,8 @@ async def bulk_upsert_layers(request: Request):
         return JSONResponse({"error": "Not authenticated."}, status_code=401)
 
     chat_id = request.path_params["chat_id"]
+    if not _is_valid_uuid(chat_id):
+        return JSONResponse({"error": "Invalid chat ID."}, status_code=400)
     user_id = str(user["id"])
 
     if not await _assert_chat_owner(chat_id, user_id):
@@ -181,9 +199,10 @@ async def bulk_upsert_layers(request: Request):
         if error:
             return JSONResponse({"error": f"Layer {i}: {error}"}, status_code=400)
 
+    tx_statements = []
     for layer in layers:
         visible = bool(layer.get("visible", True))
-        await execute(
+        tx_statements.append((
             """
             INSERT INTO app.chat_layers (chat_id, layer_id, name, shape, visible, geojson)
             VALUES (%s, %s, %s, %s, %s, %s::jsonb)
@@ -198,11 +217,13 @@ async def bulk_upsert_layers(request: Request):
                 chat_id,
                 layer["layer_id"][:_MAX_LAYER_ID_LENGTH],
                 layer["name"][:_MAX_NAME_LENGTH],
-                layer["shape"],
+                layer["shape"][:_MAX_SHAPE_LENGTH],
                 visible,
                 json.dumps(layer["geojson"]),
             ),
-        )
+        ))
+
+    await execute_transaction(tx_statements)
 
     return JSONResponse({"status": "ok", "count": len(layers)}, status_code=200)
 
@@ -214,6 +235,10 @@ async def update_layer(request: Request):
 
     chat_id = request.path_params["chat_id"]
     layer_id = request.path_params["layer_id"]
+    if not _is_valid_uuid(chat_id):
+        return JSONResponse({"error": "Invalid chat ID."}, status_code=400)
+    if len(layer_id) > _MAX_LAYER_ID_LENGTH:
+        return JSONResponse({"error": "Invalid layer ID."}, status_code=400)
     user_id = str(user["id"])
 
     if not await _assert_chat_owner(chat_id, user_id):
@@ -240,8 +265,11 @@ async def update_layer(request: Request):
         params.append(name)
 
     if "shape" in data:
+        shape_val = (data["shape"] or "")[:_MAX_SHAPE_LENGTH]
+        if not shape_val:
+            return JSONResponse({"error": "'shape' cannot be empty."}, status_code=400)
         set_parts.append("shape = %s")
-        params.append(data["shape"])
+        params.append(shape_val)
 
     if "geojson" in data:
         geojson = data["geojson"]
@@ -279,6 +307,10 @@ async def delete_layer(request: Request):
 
     chat_id = request.path_params["chat_id"]
     layer_id = request.path_params["layer_id"]
+    if not _is_valid_uuid(chat_id):
+        return JSONResponse({"error": "Invalid chat ID."}, status_code=400)
+    if len(layer_id) > _MAX_LAYER_ID_LENGTH:
+        return JSONResponse({"error": "Invalid layer ID."}, status_code=400)
     user_id = str(user["id"])
 
     if not await _assert_chat_owner(chat_id, user_id):

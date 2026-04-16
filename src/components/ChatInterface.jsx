@@ -308,13 +308,14 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
         setChatsLoaded(false); // Invalidate so history refreshes next open.
 
         // Bulk-persist any pre-existing drawn layers to the newly created chat.
-        if (drawnLayers.length > 0) {
+        const persistable = drawnLayers.filter(l => l.id && l.geoJson);
+        if (persistable.length > 0) {
           apiFetch(`/api/chats/${data.chat_id}/layers/bulk`, {
             method: 'POST',
             body: JSON.stringify({
-              layers: drawnLayers.map(l => ({
+              layers: persistable.map(l => ({
                 layer_id: l.id,
-                name: l.name,
+                name: l.name || 'Untitled layer',
                 shape: l.shape || 'Feature',
                 visible: l.visible !== false,
                 geojson: l.geoJson,
