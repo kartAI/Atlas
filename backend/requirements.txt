@@ -12,6 +12,7 @@ github-copilot-sdk
 pydantic
 bcrypt
 sqlglot
+openai>=1.0.0
 
 # GIS dependencies — gis-mcp[visualize] includes shapely, geopandas, rasterio, fastmcp, and visualization libs (matplotlib, folium, pydeck).
 gis-mcp[visualize]

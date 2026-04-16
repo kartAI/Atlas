@@ -30,6 +30,7 @@ Entry points:
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
@@ -299,6 +300,74 @@ async def refresh_processing_lease(blob_name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Embedding cache — avoid re-embedding unchanged chunk text
+# ---------------------------------------------------------------------------
+
+def _text_hash(text: str) -> str:
+    """SHA-256 hex digest of chunk text, used as a cache key."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+async def _prefetch_embedding_cache(document_id: int) -> dict[str, list[float]]:
+    """
+    Fetch existing chunk embeddings for a document and return a
+    text_hash → embedding_vector mapping.
+
+    Called *before* DELETE so we can reuse embeddings for chunks whose
+    text content hasn't changed during a re-index, saving API calls.
+    """
+    rows = await query(
+        """
+        SELECT text, embedding
+        FROM chunks
+        WHERE document_id = %(doc_id)s
+          AND embedding IS NOT NULL
+        """,
+        {"doc_id": document_id},
+    )
+    # Determine expected dimensions from the current embedding provider
+    try:
+        from embedding_client import _dimensions as _current_dims
+    except Exception:
+        _current_dims = 0  # unknown — skip dimension validation
+
+    cache: dict[str, list[float]] = {}
+    for row in rows:
+        text = row["text"]
+        emb_raw = row["embedding"]
+        if text and emb_raw:
+            # pgvector returns embedding as a string "[0.1,0.2,...]" or list
+            try:
+                if isinstance(emb_raw, str):
+                    emb = json.loads(emb_raw)
+                elif isinstance(emb_raw, (list, tuple)):
+                    emb = list(emb_raw)
+                else:
+                    continue
+            except (json.JSONDecodeError, ValueError):
+                logger.warning(
+                    "_prefetch_embedding_cache: skipping malformed embedding for doc_id=%s",
+                    document_id,
+                )
+                continue
+            # Discard cached vectors whose dimensions don't match the current config
+            if _current_dims and len(emb) != _current_dims:
+                logger.debug(
+                    "_prefetch_embedding_cache: discarding stale %d-dim vector "
+                    "(expected %d) for doc_id=%s",
+                    len(emb), _current_dims, document_id,
+                )
+                continue
+            cache[_text_hash(text)] = emb
+    if cache:
+        logger.info(
+            "_prefetch_embedding_cache: doc_id=%s → %d cached embeddings",
+            document_id, len(cache),
+        )
+    return cache
+
+
+# ---------------------------------------------------------------------------
 # Step 6: Save chunks with per-chunk embeddings
 # ---------------------------------------------------------------------------
 
@@ -330,29 +399,58 @@ async def save_chunks(
     if not chunks:
         return (0, 0)
 
+    # --- Pre-fetch existing embeddings to avoid redundant API calls on re-index ---
+    emb_cache = await _prefetch_embedding_cache(document_id)
+
     # --- Step 1: generate embeddings in batches (outside transaction — external API) ---
     texts       = [c["text"] for c in chunks]
     all_vectors: list[list[float] | None] = []
 
-    try:
-        from embedding_client import get_embeddings
-        for batch_start in range(0, len(texts), _EMBEDDING_BATCH_SIZE):
-            batch = texts[batch_start:batch_start + _EMBEDDING_BATCH_SIZE]
-            try:
-                batch_vectors = await get_embeddings(batch)
-                all_vectors.extend(batch_vectors)
-            except Exception as e:
-                logger.warning(
-                    "save_chunks: embedding batch %d–%d failed for doc %s: %s",
-                    batch_start, batch_start + len(batch) - 1, document_id, e,
-                )
-                all_vectors.extend([None] * len(batch))
-            if lease_blob_name:
-                await refresh_processing_lease(lease_blob_name)
-    except ValueError as e:
-        # GITHUB_MODELS_TOKEN not configured — store chunks without embeddings
-        logger.warning("save_chunks: %s — storing chunks without embeddings", e)
-        all_vectors = [None] * len(chunks)
+    # Separate chunks into cached (reuse) and uncached (need API call)
+    cache_hits = 0
+    uncached_indices: list[int] = []
+    for i, text in enumerate(texts):
+        cached = emb_cache.get(_text_hash(text))
+        if cached is not None:
+            all_vectors.append(cached)
+            cache_hits += 1
+        else:
+            all_vectors.append(None)  # placeholder — filled below
+            uncached_indices.append(i)
+
+    if cache_hits:
+        logger.info(
+            "save_chunks: doc_id=%s — %d/%d embeddings reused from cache",
+            document_id, cache_hits, len(texts),
+        )
+
+    # Only call the embedding API for uncached chunks
+    if uncached_indices:
+        uncached_texts = [texts[i] for i in uncached_indices]
+        try:
+            from embedding_client import get_embeddings
+            new_vectors: list[list[float] | None] = []
+            for batch_start in range(0, len(uncached_texts), _EMBEDDING_BATCH_SIZE):
+                batch = uncached_texts[batch_start:batch_start + _EMBEDDING_BATCH_SIZE]
+                try:
+                    batch_vectors = await get_embeddings(batch)
+                    new_vectors.extend(batch_vectors)
+                except Exception as e:
+                    logger.warning(
+                        "save_chunks: embedding batch %d–%d failed for doc %s: %s",
+                        batch_start, batch_start + len(batch) - 1, document_id, e,
+                    )
+                    new_vectors.extend([None] * len(batch))
+                if lease_blob_name:
+                    await refresh_processing_lease(lease_blob_name)
+
+            # Slot new vectors back into the all_vectors list
+            for vec_idx, orig_idx in enumerate(uncached_indices):
+                if vec_idx < len(new_vectors):
+                    all_vectors[orig_idx] = new_vectors[vec_idx]
+        except ValueError as e:
+            # No embedding provider configured — store chunks without embeddings
+            logger.warning("save_chunks: %s — storing chunks without embeddings", e)
 
     # Guard: ensure vector list length matches chunk list length
     if len(all_vectors) != len(chunks):

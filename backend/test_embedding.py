@@ -1,5 +1,7 @@
 """
-Minimal test: call the GitHub Models embeddings API with a sample string.
+Live integration test: call the configured embeddings provider with real Norwegian text.
+
+Auto-detects the active provider from .env (Azure OpenAI takes priority over GitHub Models).
 
 Usage:
   cd backend
@@ -7,24 +9,22 @@ Usage:
 """
 
 import asyncio
-import os
 import sys
-from pathlib import Path
 
-# Load .env from project root
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv()
 
-from embedding_client import get_single_embedding, get_embeddings
+from embedding_client import get_single_embedding, get_embeddings, get_provider_name
 
 
 async def main():
-    token = os.getenv("GITHUB_MODELS_TOKEN")
-    if not token:
-        print("ERROR: GITHUB_MODELS_TOKEN is not set in .env")
+    try:
+        provider = get_provider_name()
+    except ValueError as e:
+        print("ERROR: %s" % e)
         sys.exit(1)
 
-    print("Token loaded (length: %d)" % len(token))
+    print("Provider:   %s" % provider)
 
     # Test 1: single embedding
     print("\n--- Test 1: single embedding ---")
