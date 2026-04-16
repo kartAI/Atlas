@@ -15,7 +15,7 @@ import {
   setActiveChatId,
 } from '../utils/auth';
 
-export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], onLayerCreated, selectedTools = [], onClearSelectedTools, onRemoveTool }) {
+export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], onLayerCreated, onSetDrawnLayers, selectedTools = [], onClearSelectedTools, onRemoveTool }) {
   // Auth state
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -72,6 +72,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
       setAttachments([]);
       setUsageSession(null);
       setUsageMonthly(null);
+      onSetDrawnLayers?.([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalUser]);
@@ -102,6 +103,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
           const loaded = await loadChatMessages(savedChatId);
           if (loaded) {
             setActiveChatIdState(savedChatId);
+            await loadChatLayers(savedChatId);
           } else {
             clearActiveChatId();
           }
@@ -158,6 +160,24 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     }
   }
 
+  async function loadChatLayers(chatId) {
+    try {
+      const res = await apiFetch(`/api/chats/${chatId}/layers`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const loaded = (data.layers || []).map(l => ({
+        id: l.layer_id,
+        name: l.name,
+        shape: l.shape,
+        visible: l.visible,
+        geoJson: l.geojson,
+      }));
+      onSetDrawnLayers?.(loaded);
+    } catch {
+      // Non-critical; layers stay empty.
+    }
+  }
+
   function handleAuthSuccess(userData) {
     setUser(userData);
     setActiveChatIdState(null);
@@ -178,6 +198,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     setActiveTab('chat');
     setUsageSession(null);
     setUsageMonthly(null);
+    onSetDrawnLayers?.([]);
   }
 
   async function handleContinueChat(chatId) {
@@ -186,6 +207,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     setActiveChatIdState(chatId);
     setActiveChatId(chatId);
     setActiveTab('chat');
+    // Load persisted layers for this chat.
+    await loadChatLayers(chatId);
     // Fetch current usage for this chat if a tracker exists on the backend.
     setUsageSession(null);
     setUsageMonthly(null);
@@ -270,12 +293,12 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
             ? 'FeatureCollection'
             : (geojson?.geometry?.type || 'Feature');
           onLayerCreated({
-            id: `drawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            id: action.layer_id || `drawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             name: action.layer_name,
             shape,
             geoJson: geojson,
             visible: true,
-          });
+          }, { persisted: true });
         });
       }
 
@@ -283,6 +306,22 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
         setActiveChatIdState(data.chat_id);
         setActiveChatId(data.chat_id);
         setChatsLoaded(false); // Invalidate so history refreshes next open.
+
+        // Bulk-persist any pre-existing drawn layers to the newly created chat.
+        if (drawnLayers.length > 0) {
+          apiFetch(`/api/chats/${data.chat_id}/layers/bulk`, {
+            method: 'POST',
+            body: JSON.stringify({
+              layers: drawnLayers.map(l => ({
+                layer_id: l.id,
+                name: l.name,
+                shape: l.shape || 'Feature',
+                visible: l.visible !== false,
+                geojson: l.geoJson,
+              })),
+            }),
+          }).catch(() => { /* fire-and-forget */ });
+        }
       }
 
       // Update usage state from the response.
