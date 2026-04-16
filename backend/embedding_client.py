@@ -83,9 +83,21 @@ def _init_client() -> None:
     azure_api_version = os.getenv(
         "AZURE_OPENAI_API_VERSION", _DEFAULT_AZURE_API_VERSION
     )
-    _dimensions = int(
-        os.getenv("AZURE_OPENAI_EMBEDDING_DIMENSIONS", str(_DEFAULT_EMBEDDING_DIMENSIONS))
-    )
+    raw_dims = os.getenv("AZURE_OPENAI_EMBEDDING_DIMENSIONS", "").strip()
+    if raw_dims:
+        try:
+            parsed_dims = int(raw_dims)
+        except ValueError:
+            raise ValueError(
+                f"AZURE_OPENAI_EMBEDDING_DIMENSIONS must be a positive integer, got {raw_dims!r}"
+            )
+        if parsed_dims <= 0:
+            raise ValueError(
+                f"AZURE_OPENAI_EMBEDDING_DIMENSIONS must be a positive integer, got {parsed_dims}"
+            )
+        _dimensions = parsed_dims
+    else:
+        _dimensions = _DEFAULT_EMBEDDING_DIMENSIONS
 
     github_token = os.getenv("GITHUB_MODELS_TOKEN", "").strip()
 
@@ -131,7 +143,8 @@ def _get_client() -> tuple[AsyncAzureOpenAI | AsyncOpenAI, str]:
     """Return the initialised client and model name. Initialises on first call."""
     if _client is None:
         _init_client()
-    assert _client is not None  # for type checker — ValueError would have been raised
+    if _client is None:  # _init_client raises ValueError if unconfigured; this guards against unexpected states
+        raise RuntimeError("Embedding client failed to initialise.")
     return _client, _model
 
 
@@ -156,10 +169,15 @@ async def get_embeddings(texts: list[str]) -> list[list[float]]:
 
     client, model = _get_client()
 
+    # GitHub Models does not support the `dimensions` parameter — only pass it for Azure OpenAI
+    extra_kwargs: dict = {}
+    if _provider == "azure_openai":
+        extra_kwargs["dimensions"] = _dimensions
+
     response = await client.embeddings.create(
         input=texts,
         model=model,
-        dimensions=_dimensions,
+        **extra_kwargs,
     )
 
     items = sorted(response.data, key=lambda x: x.index)
