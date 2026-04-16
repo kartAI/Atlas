@@ -48,6 +48,7 @@ from starlette.responses import JSONResponse, StreamingResponse
 
 from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT, list_documents
 from copilot import CopilotClient
+from sanitizer import sanitize_thinking as _sanitize_thinking
 from session_manager import SessionManager
 from usage_tracker import get_or_create_tracker, get_tracker
 from db import init_db_pool, close_pool, execute, execute_transaction, query
@@ -286,13 +287,6 @@ async def chat(request: Request):
     })
 
 
-# ---------------------------------------------------------------------------
-# Thinking-trace sanitizer
-# ---------------------------------------------------------------------------
-
-from sanitizer import sanitize_thinking as _sanitize_thinking
-
-
 async def _stream_chat(copilot_session, message, map_context, chat_id, user_id, created_chat, tool_hints, tracker):
     """
     Async generator that yields SSE events for a streaming chat response.
@@ -331,25 +325,57 @@ async def _stream_chat(copilot_session, message, map_context, chat_id, user_id, 
         yield f"event: error\ndata: {json.dumps({'error': 'AI service error. Please try again.'})}\n\n"
         return
 
+    # Assign stable layer_ids to AI-generated layers (mirrors non-streaming path).
+    for action in map_actions:
+        action["layer_id"] = f"drawn-{int(time.time() * 1000)}-{secrets.token_hex(3)}"
+
     turn_usage = tracker.finalise_turn()
     usage_snapshot = tracker.snapshot(turn_usage)
 
-    # Persist the full exchange
+    # Persist the full exchange + AI layers atomically.
+    tx_statements = [
+        (
+            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
+            (chat_id, "user", message),
+        ),
+        (
+            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
+            (chat_id, "assistant", reply),
+        ),
+        (
+            "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (chat_id,),
+        ),
+    ]
+
+    for action in map_actions:
+        geojson = action.get("geojson")
+        if not geojson or not isinstance(geojson, dict):
+            continue
+        shape = geojson.get("type", "Feature")
+        if shape == "FeatureCollection":
+            pass  # keep as-is
+        elif geojson.get("geometry"):
+            shape = geojson["geometry"].get("type", "Feature")
+        tx_statements.append((
+            """
+            INSERT INTO app.chat_layers (chat_id, layer_id, name, shape, visible, geojson)
+            VALUES (%s, %s, %s, %s, TRUE, %s::jsonb)
+            ON CONFLICT (chat_id, layer_id)
+            DO UPDATE SET name = EXCLUDED.name, shape = EXCLUDED.shape,
+                          geojson = EXCLUDED.geojson, updated_at = now()
+            """,
+            (
+                chat_id,
+                action["layer_id"],
+                action.get("layer_name", "AI-lag"),
+                shape,
+                json.dumps(geojson),
+            ),
+        ))
+
     try:
-        await execute_transaction([
-            (
-                "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-                (chat_id, "user", message),
-            ),
-            (
-                "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-                (chat_id, "assistant", reply),
-            ),
-            (
-                "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (chat_id,),
-            ),
-        ])
+        await execute_transaction(tx_statements)
     except Exception as exc:
         logger.error("Failed to persist messages for chat %s: %s", chat_id, exc)
         await manager.discard_chat(chat_id)

@@ -290,9 +290,10 @@ class SessionManager:
             await session.send(full_message)
 
             # Yield events as they arrive until the session goes idle.
-            deadline = asyncio.get_event_loop().time() + _STREAM_TIMEOUT
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + _STREAM_TIMEOUT
             while not idle_event.is_set():
-                remaining = deadline - asyncio.get_event_loop().time()
+                remaining = deadline - loop.time()
                 if remaining <= 0:
                     raise TimeoutError(f"Streaming timed out after {_STREAM_TIMEOUT}s")
                 try:

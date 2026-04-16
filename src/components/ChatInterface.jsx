@@ -88,6 +88,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   const [attachments, setAttachments] = useState([]);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
+  const streamAbortRef = useRef(null);
   const textareaRef = useRef(null);
 
   const MAX_TEXTAREA_HEIGHT = 250; // ~5 rows
@@ -129,6 +130,11 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalUser]);
+
+  // Abort any in-flight streaming fetch when the component unmounts.
+  useEffect(() => {
+    return () => { streamAbortRef.current?.abort(); };
+  }, []);
 
   // On mount: verify token, restore last active chat
   useEffect(() => {
@@ -326,6 +332,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     });
 
     try {
+      const abortController = new AbortController();
+      streamAbortRef.current = abortController;
       const res = await apiFetch('/api/chat', {
         method: 'POST',
         body: JSON.stringify({
@@ -335,6 +343,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
           tool_hints: sentTools.map(t => t.mcpTool),
           stream: true,
         }),
+        signal: abortController.signal,
       });
 
       if (!res.ok) {
@@ -459,7 +468,8 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
           }
         }
       }
-    } catch {
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // component unmounted — nothing to update
       setMessages(prev => {
         const copy = [...prev];
         if (assistantIdx.current !== null && assistantIdx.current < copy.length) {
@@ -470,6 +480,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
         return copy;
       });
     } finally {
+      streamAbortRef.current = null;
       setIsLoading(false);
     }
   }
