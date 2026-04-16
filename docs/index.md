@@ -17,7 +17,7 @@ Atlas er en GeoMCP-chatbot utviklet for å assistere saksbehandlere i arbeid med
 
 ## Mørk og lys modus
 
-![Dark/light mode toggle](assets/darklight.gif)
+![Dark/light mode toggle](assets/EditedLightmode.gif)
 
 Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
 
@@ -25,7 +25,7 @@ Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
 
 ## Interaktivt kart
 
-![Map overview](assets/map-overview.gif)
+![Map overview](assets/Basemaps.gif)
 
 Kartarbeidsområdet er sentrert på Norge med bakgrunnskart fra Kartverket og flyfoto fra Esri.
 Brukere kan bytte mellom bakgrunnskart i sanntid.
@@ -39,7 +39,24 @@ Brukere kan bytte mellom bakgrunnskart i sanntid.
 Leaflet-Geoman gir tilgang til tegning av markører, polygoner, rektangler, linjer og sirkler,
 samt redigering og fjerning av eksisterende lag. Posisjonering bruker nettleserens Geolocation API.
 
+## Verktøy i aksjon
+
+**1 — Velg og send verktøy**
+
+![Tool sidebar](assets/SidebarTools.gif)
+
+**2 — Resultat fra assistenten**
+
+![Tool result](assets/ToolUsed.png)
+
 ---
+
+## Laghåndtering
+
+![Layer management](assets/MapLayersSidebar.gif)
+
+Hvert kartlag kan skjules, vises på nytt eller slettes fra sidepanelet.
+AI-genererte lag og brukerens egne lag behandles likt.
 
 ## AI-assistent og chat
 
@@ -48,25 +65,13 @@ samt redigering og fjerning av eksisterende lag. Posisjonering bruker nettlesere
 Autentiserte brukere kan starte, gjenoppta og slette samtaler. Assistenten har tilgang til
 MCP-verktøy og kan svare med kartlag som tegnes direkte i grensesnittet.
 
----
+### Tokenforbruk
 
-## MCP-verktøy i aksjon
+![Token usage](assets/tokenusage.gif)
 
-![MCP spatial query](assets/mcp-tools.gif)
-
-Assistenten orkestrerer verktøy fra seks MCP-tjenere:
-
-| Tjener | Hva den gjør |
-|---|---|
-| `db_server` | Skjemaoversikt og SQL-oppslag |
-| `geo_server` | Kommuner, vernetyper, buffersøk |
-| `docs_server` | PDF-listing og tekstuttrekk fra Azure Blob |
-| `vector_server` | Buffer, snitt, envelope, punkt-i-polygon |
-| `map_server` | Sender resultater tilbake som kartlag |
-| `search_server` | Fulltekst, fuzzy, semantisk og hybrid søk |
+Brukere kan se tokenforbruk per melding direkte i chatten.
 
 ---
-
 ## Romlige analyser
 
 ![Spatial analysis](assets/spatial-analysis.gif)
@@ -82,15 +87,6 @@ kartoppslag – resultatene dukker opp som lag i kartet uten manuell behandling.
 
 Assistenten kan søke i og hente innhold fra PDF-dokumenter lagret i Azure Blob Storage,
 og bruke disse som kontekst i svar.
-
----
-
-## Laghåndtering
-
-![Layer management](assets/layers.gif)
-
-Hvert kartlag kan skjules, vises på nytt eller slettes fra sidepanelet.
-AI-genererte lag og brukerens egne lag behandles likt.
 
 ---
 
