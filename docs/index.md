@@ -19,13 +19,13 @@ Atlas er en GeoMCP-chatbot utviklet for å assistere saksbehandlere i arbeid med
 
 ### Registrering
 
-![Register flow](assets/register.gif)
+![Register flow](assets/registermodal.gif)
 
 Nye brukere kan registrere seg gjennom logg inn knappen.
 
 ### Innlogging 
 
-![Login flow](assets/Login.gif)
+![Login flow](assets/loginmodal.gif)
 
 
 Eksisterende brukere logger inn gjennom samme knapp. 
@@ -36,7 +36,7 @@ Eksisterende brukere logger inn gjennom samme knapp.
 
 ### Send Melding
 
-![Sende melding](assets/Chat.gif)
+![Sende melding](assets/sendChat.gif) 
 
 Enkelt skriv spørsmål eller forespørsler, deretter få svar fra assistenten. 
 
