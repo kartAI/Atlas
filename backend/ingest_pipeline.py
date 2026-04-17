@@ -115,28 +115,6 @@ async def extract_blocks(blob_name: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Processing lease heartbeat
-# ---------------------------------------------------------------------------
-
-async def refresh_processing_lease(blob_name: str) -> None:
-    """
-    Refresh the updated_at lease for an in-flight document.
-
-    This prevents run_pipeline() from reclaiming a legitimate long-running
-    'processing' row as stale while external embedding calls are still active.
-    """
-    await execute(
-        """
-        UPDATE documents
-        SET updated_at = now()
-        WHERE source_blob = %(blob)s
-          AND indexing_status = 'processing'
-        """,
-        {"blob": blob_name},
-    )
-
-
-# ---------------------------------------------------------------------------
 # Step 4: Fallback chunking for document-level embedding
 # ---------------------------------------------------------------------------
 

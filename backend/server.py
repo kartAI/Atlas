@@ -8,7 +8,7 @@ Mounts MCP servers alongside the existing REST API:
   /mcp/docs/mcp    — Document tools  (list_documents, fetch_document)
   /mcp/vector/mcp  — Vector tools    (buffer, intersection, envelope, get_coordinates, point_in_polygon, get_verdensarv_sites, voronoi)
   /mcp/map/mcp     — Map tools       (draw_shape)
-  /mcp/search/mcp  — Search tools    (search_documents, search_documents_fuzzy, search_documents_semantic, search_hybrid, index_*, get_indexing_status)
+  /mcp/search/mcp  — Search tools    (search_documents, search_documents_fuzzy, search_documents_semantic, search_hybrid, get_search_result_chunk, index_*, get_indexing_status)
 
 Auth endpoints:
   POST /api/auth/register
@@ -24,9 +24,10 @@ Chat management endpoints:
   DELETE /api/chats/{chat_id}
 
 AI orchestration:
-  POST /api/chat      — Send a message; persists to DB, returns AI reply
-  GET  /api/documents — Azure document list
-  GET  /api/search    — Quick test endpoint for document search
+  POST /api/chat                 — Send a message; persists to DB, returns AI reply
+  GET  /api/documents            — Azure document list
+  GET  /api/search               — Quick test endpoint for document search
+  GET  /api/search/chunks/{id}   — Fetch full text behind a semantic search hit
 """
 
 import logging
@@ -314,6 +315,28 @@ async def test_search(request: Request):
     return JSONResponse({"query": q, "mode": mode, "count": len(results), "results": results})
 
 
+async def test_search_chunk(request: Request):
+    """Fetch the full chunk payload for a semantic search result by chunk_id."""
+    if not DEMO_MODE:
+        return JSONResponse({"error": "Only available in demo mode."}, status_code=403)
+
+    chunk_id_raw = request.path_params.get("chunk_id")
+    try:
+        chunk_id = int(chunk_id_raw)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "Bruk et gyldig chunk_id."}, status_code=400)
+
+    if chunk_id <= 0:
+        return JSONResponse({"error": "chunk_id må være et positivt heltall."}, status_code=400)
+
+    from search_service import get_chunk_by_id
+
+    chunk = await get_chunk_by_id(chunk_id)
+    if chunk is None:
+        return JSONResponse({"error": f"Fant ikke chunk {chunk_id}."}, status_code=404)
+    return JSONResponse({"chunk": chunk})
+
+
 # ---------------------------------------------------------------------------
 # Assemble the Starlette application
 # ---------------------------------------------------------------------------
@@ -360,6 +383,7 @@ app = Starlette(
         # Miscellaneous
         Route("/api/documents", endpoint=get_documents, methods=["GET"]),
         Route("/api/test-db",   endpoint=test_db,       methods=["GET"]),
+        Route("/api/search/chunks/{chunk_id}", endpoint=test_search_chunk, methods=["GET"]),
         Route("/api/search",    endpoint=test_search,   methods=["GET"]),
     ],
     middleware=[

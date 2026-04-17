@@ -469,28 +469,20 @@ def test_semantic_chunk_search_filters_status():
     asyncio.run(go())
 
 
-def test_semantic_chunk_search_uses_candidate_first_vector_order():
-    """Chunk semantic search should order chunk candidates by vector distance before deduping."""
+def test_semantic_chunk_search_uses_exact_best_per_document_ranking():
+    """Chunk semantic search should rank the best chunk per document without a candidate cutoff."""
     async def go():
         with patch.object(search_service, "query", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = []
             await search_service._search_semantic_chunks([0.1] * 10, "regelverk", 10)
             sql, params = mock_query.call_args.args
-            assert_in("semantic chunk search uses candidate CTE", "WITH nearest_chunks AS", sql)
+            assert_in("semantic chunk search uses DISTINCT ON", "SELECT DISTINCT ON (d.id)", sql)
             assert_in(
-                "semantic chunk search orders candidates by vector distance",
-                "ORDER BY c.embedding <=> %(emb)s::vector",
+                "semantic chunk search orders within each document by vector distance",
+                "ORDER BY d.id, c.embedding <=> %(emb)s::vector",
                 sql,
             )
-            assert_in("semantic chunk search limits candidate set", "LIMIT %(candidate_lim)s", sql)
-            assert_equal(
-                "semantic chunk candidate limit uses configured heuristic",
-                params["candidate_lim"],
-                max(
-                    10 * search_service._SEMANTIC_CHUNK_CANDIDATE_MULTIPLIER,
-                    search_service._SEMANTIC_CHUNK_MIN_CANDIDATES,
-                ),
-            )
+            assert_true("semantic chunk search does not use a candidate limit", "candidate_lim" not in params)
 
     asyncio.run(go())
 
@@ -540,6 +532,23 @@ def test_semantic_chunk_search_truncates_content():
     asyncio.run(go())
 
 
+def test_get_chunk_by_id_returns_plain_dict():
+    """get_chunk_by_id should normalize the DB row into a plain dict."""
+    async def go():
+        with patch.object(search_service, "query", new_callable=AsyncMock) as mock_query:
+            mock_query.return_value = [{
+                "chunk_id": 10,
+                "document_id": 1,
+                "document_title": "Doc",
+                "content": "Full chunk text",
+            }]
+            chunk = await search_service.get_chunk_by_id(10)
+            assert_equal("get_chunk_by_id returns chunk dict", chunk["chunk_id"], 10)
+            assert_equal("get_chunk_by_id returns plain content", chunk["content"], "Full chunk text")
+
+    asyncio.run(go())
+
+
 def test_full_text_empty_query_skips_db():
     """search_full_text with blank query returns [] without hitting the DB."""
     async def go():
@@ -576,9 +585,10 @@ _TESTS = [
     test_full_text_search_filters_status,
     test_fuzzy_search_filters_status,
     test_semantic_chunk_search_filters_status,
-    test_semantic_chunk_search_uses_candidate_first_vector_order,
+    test_semantic_chunk_search_uses_exact_best_per_document_ranking,
     test_semantic_document_fallback_filters_status,
     test_semantic_chunk_search_truncates_content,
+    test_get_chunk_by_id_returns_plain_dict,
     test_full_text_empty_query_skips_db,
 ]
 

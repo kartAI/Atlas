@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Fast lookup of all chunks for a given document and reading-order reconstruction.
+-- Fast lookup of all chunks for a given document and ordering by position
 CREATE INDEX IF NOT EXISTS idx_chunks_document_id
     ON chunks (document_id, chunk_index);
 
