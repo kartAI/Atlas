@@ -15,16 +15,59 @@ Atlas er en GeoMCP-chatbot utviklet for å assistere saksbehandlere i arbeid med
 
 ---
 
-## Mørk og lys modus
+## Personlige Brukere
 
-![Dark/light mode toggle](assets/EditedLightmode.gif)
+### Registrering
 
-Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
+![Register flow](assets/registermodal.gif)
+
+Nye brukere kan registrere seg gjennom logg inn knappen.
+
+### Innlogging 
+
+![Login flow](assets/loginmodal.gif)
+
+
+Eksisterende brukere logger inn gjennom samme knapp. 
 
 ---
 
-## Interaktivt kart
+## Chat
 
+### Send Melding
+
+![Sende melding](assets/sendChat.gif) 
+
+Enkelt skriv spørsmål eller forespørsler, deretter få svar fra assistenten. 
+
+---
+
+### Samtalehistorikk
+![Samtalehistorikk](assets/ChatHistory.gif)
+
+Alle tidligere samtaler vises i sidepanelet. Klikk på en samtale for å åpne den igjen og fortsette der du slapp.
+
+---
+
+### Slette en samtale
+
+![Slette samtale](assets/deleteChats.gif)
+
+Samtaler kan slettes enkeltvis fra historikkpanelet.
+
+---
+
+### Tokenforbruk
+
+![Token usage](assets/tokenusage.gif)
+
+Brukere kan se tokenforbruk per melding direkte i chatten.
+
+---
+
+##  Kart
+
+### Kart Visninger 
 ![Map overview](assets/Basemaps.gif)
 
 Kartarbeidsområdet er sentrert på Norge med bakgrunnskart fra Kartverket og flyfoto fra Esri.
@@ -32,12 +75,21 @@ Brukere kan bytte mellom bakgrunnskart i sanntid.
 
 ---
 
-## Tegning og redigering
+### Tegning i kart
 
-![Drawing tools](assets/draw-tools.gif)
+![Drawing tools](assets/MapDraw.gif)
 
-Leaflet-Geoman gir tilgang til tegning av markører, polygoner, rektangler, linjer og sirkler,
+Leaflet gir tilgang til tegning av markører, polygoner, rektangler, linjer og sirkler,
 samt redigering og fjerning av eksisterende lag. Posisjonering bruker nettleserens Geolocation API.
+
+### Laghåndtering
+
+![Layer management](assets/MapLayersSidebar.gif)
+
+Hvert kartlag kan skjules, vises på nytt eller slettes fra sidepanelet.
+AI-genererte lag og brukerens egne lag behandles likt.
+
+---
 
 ## Verktøy i aksjon
 
@@ -51,48 +103,9 @@ samt redigering og fjerning av eksisterende lag. Posisjonering bruker nettlesere
 
 ---
 
-## Laghåndtering
-
-![Layer management](assets/MapLayersSidebar.gif)
-
-Hvert kartlag kan skjules, vises på nytt eller slettes fra sidepanelet.
-AI-genererte lag og brukerens egne lag behandles likt.
-
-## AI-assistent og chat
-
-![Chat interface](assets/chat-demo.gif)
-
-Autentiserte brukere kan starte, gjenoppta og slette samtaler. Assistenten har tilgang til
-MCP-verktøy og kan svare med kartlag som tegnes direkte i grensesnittet.
-
-### Tokenforbruk
-
-![Token usage](assets/tokenusage.gif)
-
-Brukere kan se tokenforbruk per melding direkte i chatten.
-
----
-## Romlige analyser
-
-![Spatial analysis](assets/spatial-analysis.gif)
-
-Bruker kan be assistenten om å kjøre buffersøk, geometrioperasjoner og domenespesifikke
-kartoppslag – resultatene dukker opp som lag i kartet uten manuell behandling.
-
----
-
-## Dokumentsøk
-
-![Document search](assets/doc-search.gif)
-
-Assistenten kan søke i og hente innhold fra PDF-dokumenter lagret i Azure Blob Storage,
-og bruke disse som kontekst i svar.
-
----
-
 ## Eksport
 
-![Export panel](assets/export.gif)
+![Export panel](assets/ExportLayers.gif)
 
 Valgte lag kan eksporteres direkte fra nettleseren:
 
@@ -103,13 +116,11 @@ Valgte lag kan eksporteres direkte fra nettleseren:
 
 ---
 
-## Autentisering
+## Mørk og lys modus
 
-![Auth flow](assets/auth.gif)
+![Dark/light mode toggle](assets/EditedLightmode.gif)
 
-Brukere logger inn via et modalt grensesnitt. Passord er bcrypt-hashet, og sesjonstokens
-er hashet i databasen. Sesjonstatus lagres i `localStorage`.
+Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
 
 ---
 
-## Arkitektur
