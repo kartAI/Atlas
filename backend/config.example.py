@@ -1,7 +1,5 @@
 import os
 from dotenv import load_dotenv
-from azure.storage.blob import BlobServiceClient
-import fitz
 
 load_dotenv()
 
@@ -38,34 +36,6 @@ Your system prompt here.
 # Azure Blob Storage configuration
 AZURE_CONNECTION_STRING = os.getenv("AZURE_CONNECTION_STRING")
 BLOB_CONTAINER_NAME = os.getenv("BLOB_CONTAINER_NAME")
-
-# Function to list documents in Azure Blob Storage
-
-# def list_documents():
-#   blob_service = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
-#    container = blob_service.get_container_client(BLOB_CONTAINER_NAME)
-#    return [blob.name for blob in container.list_blobs() if blob.name.endswith(".pdf") or blob.name.endswith(".PDF")]
-
-# def list_documents_with_metadata():
-#    """Return PDF blobs with name, last_modified (datetime), and file_hash (etag)."""
-#    blob_service = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
-#    container = blob_service.get_container_client(BLOB_CONTAINER_NAME)
-#    return [
-#        {"name": blob.name, "last_modified": blob.last_modified, "file_hash": blob.etag or ""}
-#        for blob in container.list_blobs()
-#        if blob.name.endswith(".pdf") or blob.name.endswith(".PDF")
-#    ]
-
-# def fetch_document(blob_name):
-#    blob_service = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
-#    container = blob_service.get_container_client(BLOB_CONTAINER_NAME)
-#    blob_data = container.download_blob(blob_name).readall()
-#    doc = fitz.open(stream=blob_data, filetype="pdf")
-#    text = ""
-#    for page in doc:
-#        text += page.get_text()
-#    doc.close()
-#    return text
 
 
 # POSTGRESQL DATABASE URL
