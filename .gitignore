@@ -29,3 +29,5 @@ config.py
 __pycache__/
 .venv/
 venv/
+/.github
+backend/agent_tool_catalog.py

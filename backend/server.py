@@ -29,8 +29,11 @@ AI orchestration:
   GET  /api/search    — Quick test endpoint for document search
 """
 
+import json
 import logging
 import os
+import secrets
+import time
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -61,6 +64,11 @@ from chat_routes import (
     chat_detail_handler,
     chats_handler,
     get_messages,
+)
+from layer_routes import (
+    bulk_upsert_layers,
+    layer_detail_handler,
+    layers_handler,
 )
 
 # Import the MCP ASGI apps
@@ -194,26 +202,58 @@ async def chat(request: Request):
     reply = result["content"]
     map_actions = result["map_actions"]
 
+    # Assign stable layer_ids to AI-generated layers so the frontend can reference them.
+    for action in map_actions:
+        action["layer_id"] = f"drawn-{int(time.time() * 1000)}-{secrets.token_hex(3)}"
+
     # Finalise usage tracking for this turn.
     turn_usage = tracker.finalise_turn()
     usage_snapshot = tracker.snapshot(turn_usage)
 
-    # Persist the full exchange atomically so chat history never lands half-written.
+    # Persist the full exchange + AI layers atomically.
+    tx_statements = [
+        (
+            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
+            (chat_id, "user", message),
+        ),
+        (
+            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
+            (chat_id, "assistant", reply),
+        ),
+        (
+            "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (chat_id,),
+        ),
+    ]
+
+    for action in map_actions:
+        geojson = action.get("geojson")
+        if not geojson or not isinstance(geojson, dict):
+            continue
+        shape = geojson.get("type", "Feature")
+        if shape == "FeatureCollection":
+            pass  # keep as-is
+        elif geojson.get("geometry"):
+            shape = geojson["geometry"].get("type", "Feature")
+        tx_statements.append((
+            """
+            INSERT INTO app.chat_layers (chat_id, layer_id, name, shape, visible, geojson)
+            VALUES (%s, %s, %s, %s, TRUE, %s::jsonb)
+            ON CONFLICT (chat_id, layer_id)
+            DO UPDATE SET name = EXCLUDED.name, shape = EXCLUDED.shape,
+                          geojson = EXCLUDED.geojson, updated_at = now()
+            """,
+            (
+                chat_id,
+                action["layer_id"],
+                action.get("layer_name", "AI-lag"),
+                shape,
+                json.dumps(geojson),
+            ),
+        ))
+
     try:
-        await execute_transaction([
-            (
-                "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-                (chat_id, "user", message),
-            ),
-            (
-                "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-                (chat_id, "assistant", reply),
-            ),
-            (
-                "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (chat_id,),
-            ),
-        ])
+        await execute_transaction(tx_statements)
     except Exception as exc:
         logger.error("Failed to persist messages for chat %s: %s", chat_id, exc)
         await manager.discard_chat(chat_id)
@@ -335,6 +375,21 @@ app = Starlette(
         Route("/api/auth/me",       endpoint=me,       methods=["GET"]),
 
         # Chat management (more-specific paths first)
+        Route(
+            "/api/chats/{chat_id}/layers/bulk",
+            endpoint=bulk_upsert_layers,
+            methods=["POST"],
+        ),
+        Route(
+            "/api/chats/{chat_id}/layers/{layer_id}",
+            endpoint=layer_detail_handler,
+            methods=["PATCH", "DELETE"],
+        ),
+        Route(
+            "/api/chats/{chat_id}/layers",
+            endpoint=layers_handler,
+            methods=["GET", "POST"],
+        ),
         Route(
             "/api/chats/{chat_id}/messages",
             endpoint=get_messages,

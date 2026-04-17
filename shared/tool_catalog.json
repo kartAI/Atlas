@@ -142,7 +142,7 @@
       "hidden": true
     },
     {
-      "name": "List dokumenter",
+      "name": "List alle dokumenter",
       "icon": "FolderSearch",
       "server": "docs",
       "category": "Dokumenter",

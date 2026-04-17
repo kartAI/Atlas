@@ -4,7 +4,7 @@ import { Header } from './components/Header.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { ContentPanel } from './components/ContentPanel.jsx';
 import Map from './components/Map.jsx';
-import { apiFetch, clearToken, clearActiveChatId, getToken } from './utils/auth';
+import { apiFetch, clearToken, clearActiveChatId, getActiveChatId, getToken } from './utils/auth';
 
 import { faLayerGroup, faWrench, faFileExport } from '@fortawesome/free-solid-svg-icons';
 import { faMessage } from '@fortawesome/free-regular-svg-icons';
@@ -169,7 +169,7 @@ function App() {
 
   const clearSelectedTools = () => setSelectedTools([]);
 
-  const upsertDrawnLayer = (info) => {
+  const upsertDrawnLayer = (info, options = {}) => {
     setDrawnLayers(previousLayers => {
       const hasExistingLayer = previousLayers.some(layer => layer.id === info.id);
 
@@ -181,13 +181,47 @@ function App() {
         layer.id === info.id ? { ...layer, ...info } : layer
       );
     });
+
+    // Persist to DB if an active chat exists and not already persisted by the backend.
+    if (!options.persisted) {
+      const chatId = getActiveChatId();
+      if (chatId && info.geoJson) {
+        apiFetch(`/api/chats/${chatId}/layers`, {
+          method: 'POST',
+          body: JSON.stringify({
+            layer_id: info.id,
+            name: info.name || 'Untitled layer',
+            shape: info.shape || 'Feature',
+            visible: info.visible !== false,
+            geojson: info.geoJson,
+          }),
+        }).catch(() => { /* fire-and-forget */ });
+      }
+    }
   };
 
-  const setDrawnLayerVisible = (id, visible) =>
+  const setDrawnLayerVisible = (id, visible) => {
     setDrawnLayers(prev => prev.map(l => l.id === id ? { ...l, visible } : l));
+    const chatId = getActiveChatId();
+    if (chatId) {
+      apiFetch(`/api/chats/${chatId}/layers/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ visible }),
+      }).catch(() => { /* fire-and-forget */ });
+    }
+  };
 
-  const removeDrawnLayer = (id) =>
+  const removeDrawnLayer = (id) => {
     setDrawnLayers(prev => prev.filter(l => l.id !== id));
+    const chatId = getActiveChatId();
+    if (chatId) {
+      apiFetch(`/api/chats/${chatId}/layers/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }).catch(() => { /* fire-and-forget */ });
+    }
+  };
+
+  const setDrawnLayersFromDB = (layers) => setDrawnLayers(layers);
 
   const toggleLayer = (layerId) => {
     setLayers(prev => prev.map(layer => ({
@@ -242,6 +276,7 @@ function App() {
           onToggleLayer={toggleLayer}
           drawnLayers={drawnLayers}
           onLayerCreated={upsertDrawnLayer}
+          onSetDrawnLayers={setDrawnLayersFromDB}
           onSetDrawnLayerVisible={setDrawnLayerVisible}
           onRemoveDrawnLayer={removeDrawnLayer}
           onFlyToLayer={setFlyTarget}
