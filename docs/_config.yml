@@ -1,0 +1,9 @@
+title: Atlas
+description: GeoMCP-chatbot for konsekvensutredninger
+theme: jekyll-theme-cayman
+
+baseurl: "/Atlas"
+url: "https://KartAI.github.io"
+
+github:
+  repository_url: "https://github.com/KartAI/Atlas"
