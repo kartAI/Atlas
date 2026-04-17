@@ -124,3 +124,45 @@ Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
 
 ---
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  body.dark { background: #0d1117; color: #c9d1d9; }
+  body.dark .page-header { background: #161b22; background-image: none; }
+  body.dark .main-content h1,
+  body.dark .main-content h2,
+  body.dark .main-content h3,
+  body.dark .main-content h4 { color: #58a6ff; }
+  body.dark .main-content a { color: #58a6ff; }
+  body.dark hr { border-color: #30363d; }
+
+  #theme-toggle {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 999;
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+  }
+</style>
+
+<button id="theme-toggle"><i id="theme-icon" class="fa-solid fa-moon"></i></button>
+
+<script>
+  const btn = document.getElementById('theme-toggle');
+  const apply = dark => {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('theme-icon').className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+  };
+  apply(localStorage.getItem('theme') === 'dark');
+  btn.addEventListener('click', () => {
+    const dark = !document.body.classList.contains('dark');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    apply(dark);
+  });
+</script>
