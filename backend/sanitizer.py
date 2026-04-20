@@ -45,21 +45,29 @@ _RE_SQL = re.compile(
     r"[\s\S]{0,800}?;",
 )
 _RE_CONN_STRING = re.compile(
-    r"(?:postgres(?:ql)?://|DefaultEndpointsProtocol=|AccountKey=)\S+",
+    r"(?:postgres(?:ql)?://|mongodb(?:\+srv)?://|mysql://|redis://|amqp://|mssql://|"
+    r"DefaultEndpointsProtocol=|AccountKey=)\S+",
     re.IGNORECASE,
 )
-# Azure Blob Storage URLs — not covered by _RE_INTERNAL_URL (localhost-only).
+# Azure Blob Storage URLs — not covered by _RE_INTERNAL_URL.
 _RE_AZURE_BLOB = re.compile(
     r"https?://\S+\.blob\.core\.windows\.net\S*",
     re.IGNORECASE,
 )
 _RE_INTERNAL_URL = re.compile(
-    r"https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?\S*",
+    r"https?://(?:"
+    r"localhost|127\.0\.0\.1|0\.0\.0\.0"
+    r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+    r"|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+    r"|192\.168\.\d{1,3}\.\d{1,3}"
+    r"|host\.docker\.internal"
+    r")(?::\d+)?\S*",
     re.IGNORECASE,
 )
 _RE_MCP_PATH = re.compile(r"/mcp/\w+/mcp\b")
 _RE_TOKEN = re.compile(
-    r"\b(?:ghp_|github_pat_|sk-)[A-Za-z0-9_]+",
+    r"\b(?:ghp_|github_pat_|sk-)[A-Za-z0-9_]+"
+    r"|\beyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+",
 )
 # Absolute file system paths — reveals server directory layout.
 _RE_FILE_PATH = re.compile(

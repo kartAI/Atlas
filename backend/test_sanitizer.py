@@ -254,6 +254,66 @@ cases = [
         ["selector"],
         [],
     ),
+
+    # --- Private / RFC 1918 IP addresses ---
+    (
+        "Internal 10.x.x.x",
+        "Backend at http://10.0.0.5:8080/api/v1",
+        ["[internal-url]"],
+        ["10.0.0.5"],
+    ),
+    (
+        "Internal 172.16.x.x",
+        "Service http://172.16.0.1:3000/health is healthy",
+        ["[internal-url]"],
+        ["172.16.0.1"],
+    ),
+    (
+        "Internal 192.168.x.x",
+        "Running on http://192.168.1.100:5000/",
+        ["[internal-url]"],
+        ["192.168.1.100"],
+    ),
+    (
+        "Internal host.docker.internal",
+        "Connecting to http://host.docker.internal:8000/mcp/db/mcp",
+        ["[internal-url]"],
+        ["host.docker.internal"],
+    ),
+    (
+        "FP: public IP not redacted",
+        "Fetching https://40.112.72.205/api",
+        ["https://40.112.72.205/api"],
+        [],
+    ),
+
+    # --- Additional connection strings ---
+    (
+        "ConnStr mongodb",
+        "Using mongodb://admin:secret@cluster.mongodb.net/db?retryWrites=true",
+        ["[connection-string]"],
+        ["mongodb://", "secret"],
+    ),
+    (
+        "ConnStr redis",
+        "Cache at redis://default:pass@redis.host:6379",
+        ["[connection-string]"],
+        ["redis://", "pass@"],
+    ),
+    (
+        "ConnStr mysql",
+        "mysql://root:pwd@127.0.0.1:3306/mydb",
+        ["[connection-string]"],
+        ["mysql://", "root:pwd"],
+    ),
+
+    # --- JWT / Azure tokens ---
+    (
+        "Token JWT",
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.Signature_abc123",
+        ["[token]"],
+        ["eyJhbGci"],
+    ),
 ]
 
 
