@@ -354,6 +354,7 @@ class SessionManager:
             if unsub:
                 unsub()
             discard_tracker(chat_id)
+            get_and_clear_shapes(chat_id)  # discard any pending map shapes
             logger.warning(
                 "Evicted broken session for chat %s; will recreate on next request",
                 chat_id,

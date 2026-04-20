@@ -340,6 +340,125 @@ for label, inp, must_have, must_not_have in cases:
     else:
         fail += 1
 
+# ---- Streaming holdback simulation tests ----
+# These verify that secrets split across chunk boundaries are never
+# partially emitted before the sanitizer can recognise the full pattern.
+
+_HOLDBACK = 128  # must match server.py _THINKING_HOLDBACK
+
+
+def simulate_streaming(full_text, chunk_sizes):
+    """Simulate the server's streaming sanitization with holdback buffer.
+
+    Returns (final_text, list_of_deltas).
+    """
+    raw = ""
+    chars_sent = 0
+    deltas = []
+
+    pos = 0
+    for size in chunk_sizes:
+        chunk = full_text[pos:pos + size]
+        pos += size
+        if not chunk:
+            break
+        raw += chunk
+        sanitized = sanitize(raw)
+        safe_end = max(chars_sent, len(sanitized) - _HOLDBACK)
+        if safe_end > chars_sent:
+            deltas.append(sanitized[chars_sent:safe_end])
+            chars_sent = safe_end
+
+    # Final flush (mirrors server's post-loop flush)
+    sanitized = sanitize(raw)
+    if len(sanitized) > chars_sent:
+        deltas.append(sanitized[chars_sent:])
+
+    return "".join(deltas), deltas
+
+
+# (label, full_text, chunk_sizes, forbidden_in_any_delta, must_appear_in_final)
+_PAD = " " + "x" * 200  # padding so text exceeds holdback → partial emission
+
+streaming_cases = [
+    (
+        "Stream: UUID split mid-token",
+        f"The chat id is a1b2c3d4-e5f6-7890-abcd-ef1234567890{_PAD}",
+        [25, 15, 300],  # split in the middle of the UUID
+        ["a1b2c3d4", "e5f6-7890", "ef123456"],
+        ["[id]"],
+    ),
+    (
+        "Stream: connection string split",
+        f"Using postgres://user:secret@db.host:5432/mydb{_PAD}",
+        [20, 30, 300],  # split after "Using postgres://us"
+        ["postgres://", "secret", "user:"],
+        ["[connection-string]"],
+    ),
+    (
+        "Stream: token split",
+        f"Key is ghp_abcdefghijklmnopqrstuvwxyz{_PAD}",
+        [12, 25, 300],  # split after "Key is ghp_a"
+        ["ghp_"],
+        ["[token]"],
+    ),
+    (
+        "Stream: schema.table split",
+        f"Looking at app.messages for context{_PAD}",
+        [16, 10, 300],  # split after "Looking at app.m"
+        ["app.messages"],
+        ["[table]"],
+    ),
+    (
+        "Stream: internal URL split",
+        f"Calling http://10.0.0.5:8080/api/v1{_PAD}",
+        [18, 15, 300],
+        ["10.0.0.5"],
+        ["[internal-url]"],
+    ),
+    (
+        "Stream: clean text unchanged",
+        f"This is a completely normal message with no secrets{_PAD}",
+        [20, 30, 300],
+        [],
+        ["completely normal"],
+    ),
+]
+
+print("\n---- Streaming holdback tests ----")
+for label, full_text, chunk_sizes, forbidden, must_in_final in streaming_cases:
+    final, deltas = simulate_streaming(full_text, chunk_sizes)
+    passed = True
+
+    # No individual delta may contain a forbidden fragment
+    for frag in forbidden:
+        for i, d in enumerate(deltas):
+            if frag in d:
+                print(f"FAIL [{label}]: delta {i} contains forbidden {frag!r}")
+                print(f"  delta: {d!r}")
+                passed = False
+
+    # Final concatenated output must contain expected text
+    for m in must_in_final:
+        if m not in final:
+            print(f"FAIL [{label}]: expected {m!r} in final output")
+            print(f"  final: {final!r}")
+            passed = False
+
+    # Invariant: streaming result must equal batch sanitization
+    expected = sanitize(full_text)
+    if final != expected:
+        print(f"FAIL [{label}]: streaming result differs from batch sanitization")
+        print(f"  streaming: {final!r}")
+        print(f"  batch:     {expected!r}")
+        passed = False
+
+    if passed:
+        ok += 1
+        print(f"PASS [{label}]")
+    else:
+        fail += 1
+
 print()
 print(f"{ok} passed, {fail} failed")
 sys.exit(fail)

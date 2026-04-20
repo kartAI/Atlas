@@ -122,6 +122,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   // External logout signal (e.g. header logout button)
   useEffect(() => {
     if (externalUser === null && user !== null) {
+      streamAbortRef.current?.abort();
       setUser(null);
       setActiveChatIdState(null);
       setMessages([]);
@@ -268,6 +269,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   }
 
   async function handleNewChat() {
+    streamAbortRef.current?.abort();
     setActiveChatIdState(null);
     setActiveChatId(null);
     setMessages([]);
@@ -280,6 +282,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   }
 
   async function handleContinueChat(chatId) {
+    streamAbortRef.current?.abort();
     const loaded = await loadChatMessages(chatId);
     if (!loaded) return;
     setActiveChatIdState(chatId);
@@ -335,6 +338,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     if (!trimmed && attachments.length === 0) return;
     if (isLoading) return;
 
+    const wasNewChat = !activeChatId;
     const sentTools = [...selectedTools];
     const userMessage = { role: 'user', text: trimmed, attachments: [...attachments], tools: sentTools };
     setMessages(prev => [...prev, userMessage]);
@@ -481,6 +485,12 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                 };
                 return copy;
               });
+              // If persistence failed for a newly created chat, the server
+              // deleted it — clear the now-dead ID so follow-ups don't 404.
+              if (wasNewChat) {
+                setActiveChatIdState(null);
+                setActiveChatId(null);
+              }
             }
             eventType = null;
           }

@@ -305,9 +305,14 @@ async def _stream_chat(copilot_session, message, map_context, chat_id, user_id, 
     # Immediately tell the client which chat_id to use
     yield f"event: meta\ndata: {json.dumps({'chat_id': chat_id})}\n\n"
 
+    # Holdback buffer size — chars withheld from the client until the next
+    # chunk (or final flush) so that patterns split across chunk boundaries
+    # are never partially emitted before the sanitizer can recognise them.
+    _THINKING_HOLDBACK = 128
+
     reply = ""
     raw_thinking = ""       # unsanitized accumulation for full-text re-sanitization
-    prev_sanitized = ""     # last full sanitization result (for safe delta computation)
+    chars_sent = 0          # sanitized chars already emitted to client
     map_actions = []
     try:
         async for chunk in manager.send_message_stream(
@@ -319,19 +324,17 @@ async def _stream_chat(copilot_session, message, map_context, chat_id, user_id, 
                 raw_thinking += chunk["content"]
                 if len(raw_thinking) > 100_000:
                     # Safety cutoff to prevent memory issues from runaway thinking text.
-                    raw_thinking = raw_thinking[:100_000]   
+                    raw_thinking = raw_thinking[:100_000]
                 # Re-sanitize the full accumulated text so patterns that span
-                # chunk boundaries are caught (defense-in-depth).
+                # chunk boundaries are caught.
                 full_sanitized = _sanitize_thinking(raw_thinking)
-                if full_sanitized.startswith(prev_sanitized):
-                    delta = full_sanitized[len(prev_sanitized):]
-                    if delta:
-                        yield f"event: thinking\ndata: {json.dumps({'content': delta})}\n\n"
-                else:
-                    # Cross-boundary redaction: the full sanitized text is now shorter than
-                    # what was previously sent. Stop emitting deltas for this chunk.
-                    pass
-                prev_sanitized = full_sanitized
+                # Only emit up to (length − holdback) so patterns split across
+                # chunks are never partially leaked to the client.
+                safe_end = max(chars_sent, len(full_sanitized) - _THINKING_HOLDBACK)
+                if safe_end > chars_sent:
+                    delta = full_sanitized[chars_sent:safe_end]
+                    yield f"event: thinking\ndata: {json.dumps({'content': delta})}\n\n"
+                    chars_sent = safe_end
             elif ctype == "delta":
                 yield f"event: delta\ndata: {json.dumps({'content': chunk['content']})}\n\n"
             elif ctype == "done":
@@ -343,6 +346,13 @@ async def _stream_chat(copilot_session, message, map_context, chat_id, user_id, 
         logger.error("Streaming failed for chat %s: %s", chat_id, exc)
         yield f"event: error\ndata: {json.dumps({'error': 'AI service error. Please try again.'})}\n\n"
         return
+
+    # Flush any held-back thinking text now that no more chunks can arrive.
+    if raw_thinking:
+        full_sanitized = _sanitize_thinking(raw_thinking)
+        if len(full_sanitized) > chars_sent:
+            remaining = full_sanitized[chars_sent:]
+            yield f"event: thinking\ndata: {json.dumps({'content': remaining})}\n\n"
 
     # Assign stable layer_ids to AI-generated layers (mirrors non-streaming path).
     for action in map_actions:
