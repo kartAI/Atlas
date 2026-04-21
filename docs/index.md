@@ -3,7 +3,7 @@ layout: default
 ---
 
 <div align="center">
-  <img src="assets/norkartFull.png" alt="Atlas" width="400" />
+  <img id="atlas-logo" src="assets/norkartFull.png" alt="Atlas" width="400" />
   <p><em>AI-assistert geospatialt arbeidsverktøy for kartanalyse og KU-relaterte arbeidsflyter</em></p>
 </div>
 
@@ -15,16 +15,59 @@ Atlas er en GeoMCP-chatbot utviklet for å assistere saksbehandlere i arbeid med
 
 ---
 
-## Mørk og lys modus
+## Personlige Brukere
 
-![Dark/light mode toggle](assets/EditedLightmode.gif)
+### Registrering
 
-Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
+![Register flow](assets/registermodal.gif)
+
+Nye brukere kan registrere seg gjennom logg inn knappen.
+
+### Innlogging 
+
+![Login flow](assets/loginmodal.gif)
+
+
+Eksisterende brukere logger inn gjennom samme knapp. 
 
 ---
 
-## Interaktivt kart
+## Chat
 
+### Send Melding
+
+![Sende melding](assets/sendChat.gif) 
+
+Enkelt skriv spørsmål eller forespørsler, deretter få svar fra assistenten. 
+
+---
+
+### Samtalehistorikk
+![Samtalehistorikk](assets/ChatHistory.gif)
+
+Alle tidligere samtaler vises i sidepanelet. Klikk på en samtale for å åpne den igjen og fortsette der du slapp.
+
+---
+
+### Slette en samtale
+
+![Slette samtale](assets/deleteChats.gif)
+
+Samtaler kan slettes enkeltvis fra historikkpanelet.
+
+---
+
+### Tokenforbruk
+
+![Token usage](assets/tokenusage.gif)
+
+Brukere kan se tokenforbruk per melding direkte i chatten.
+
+---
+
+##  Kart
+
+### Kart Visninger 
 ![Map overview](assets/Basemaps.gif)
 
 Kartarbeidsområdet er sentrert på Norge med bakgrunnskart fra Kartverket og flyfoto fra Esri.
@@ -32,12 +75,21 @@ Brukere kan bytte mellom bakgrunnskart i sanntid.
 
 ---
 
-## Tegning og redigering
+### Tegning i kart
 
-![Drawing tools](assets/draw-tools.gif)
+![Drawing tools](assets/MapDraw.gif)
 
-Leaflet-Geoman gir tilgang til tegning av markører, polygoner, rektangler, linjer og sirkler,
+Leaflet gir tilgang til tegning av markører, polygoner, rektangler, linjer og sirkler,
 samt redigering og fjerning av eksisterende lag. Posisjonering bruker nettleserens Geolocation API.
+
+### Laghåndtering
+
+![Layer management](assets/MapLayersSidebar.gif)
+
+Hvert kartlag kan skjules, vises på nytt eller slettes fra sidepanelet.
+AI-genererte lag og brukerens egne lag behandles likt.
+
+---
 
 ## Verktøy i aksjon
 
@@ -51,48 +103,9 @@ samt redigering og fjerning av eksisterende lag. Posisjonering bruker nettlesere
 
 ---
 
-## Laghåndtering
-
-![Layer management](assets/MapLayersSidebar.gif)
-
-Hvert kartlag kan skjules, vises på nytt eller slettes fra sidepanelet.
-AI-genererte lag og brukerens egne lag behandles likt.
-
-## AI-assistent og chat
-
-![Chat interface](assets/chat-demo.gif)
-
-Autentiserte brukere kan starte, gjenoppta og slette samtaler. Assistenten har tilgang til
-MCP-verktøy og kan svare med kartlag som tegnes direkte i grensesnittet.
-
-### Tokenforbruk
-
-![Token usage](assets/tokenusage.gif)
-
-Brukere kan se tokenforbruk per melding direkte i chatten.
-
----
-## Romlige analyser
-
-![Spatial analysis](assets/spatial-analysis.gif)
-
-Bruker kan be assistenten om å kjøre buffersøk, geometrioperasjoner og domenespesifikke
-kartoppslag – resultatene dukker opp som lag i kartet uten manuell behandling.
-
----
-
-## Dokumentsøk
-
-![Document search](assets/doc-search.gif)
-
-Assistenten kan søke i og hente innhold fra PDF-dokumenter lagret i Azure Blob Storage,
-og bruke disse som kontekst i svar.
-
----
-
 ## Eksport
 
-![Export panel](assets/export.gif)
+![Export panel](assets/ExportLayers.gif)
 
 Valgte lag kan eksporteres direkte fra nettleseren:
 
@@ -103,13 +116,49 @@ Valgte lag kan eksporteres direkte fra nettleseren:
 
 ---
 
-## Autentisering
+## Mørk og lys modus
 
-![Auth flow](assets/auth.gif)
+![Dark/light mode toggle](assets/EditedLightmode.gif)
 
-Brukere logger inn via et modalt grensesnitt. Passord er bcrypt-hashet, og sesjonstokens
-er hashet i databasen. Sesjonstatus lagres i `localStorage`.
+Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
 
 ---
 
-## Arkitektur
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  body.dark { background: #0d1117; color: #c9d1d9; }
+  body.dark hr { border-color: #30363d; }
+  body.dark .main-content h3 { color: #c9d1d9; }
+
+  #theme-toggle {
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 999;
+    background: #238636;
+    color: #fff;
+    border: none;
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+  }
+</style>
+
+<button id="theme-toggle"><i id="theme-icon" class="fa-solid fa-moon"></i></button>
+
+<script>
+  const btn = document.getElementById('theme-toggle');
+  const apply = dark => {
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('theme-icon').className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    document.getElementById('atlas-logo').src = dark ? 'assets/norkartFull_white.png' : 'assets/norkartFull.png';
+  };
+  apply(localStorage.getItem('theme') === 'dark');
+  btn.addEventListener('click', () => {
+    const dark = !document.body.classList.contains('dark');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    apply(dark);
+  });
+</script>
