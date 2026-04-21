@@ -16,6 +16,7 @@ def _join(*parts: str) -> str:
 GITHUB_TOKEN = _join("gh", "p_", "abcdefghijklmnopqrst1234567890")
 GITHUB_PAT_TOKEN = _join("github", "_pat_", "ABCDEFGHIJ1234567890abcdef")
 OPENAI_STYLE_TOKEN = _join("sk", "-", "abcdefghijklmnopqrstuvwxyz1234")
+OPENAI_PROJECT_TOKEN = _join("sk", "-proj-", "abcdefghijklmnopqrstuvwxyz", "-SECRETTAIL1234567890")
 NPM_TOKEN = _join("np", "m_", "abcdefghijklmnopqrstuvwxyz1234567890")
 SLACK_BOT_TOKEN = _join("xox", "b-", "123456789012-123456789012-abcdefghijklmnopqrstuvwxyz")
 AZURE_SAS_SIG = _join("si", "g=", "Z3JhbnQtdGhpcy1pcy1hLWxvbmctc2VjcmV0JTJGJTNE")
@@ -27,6 +28,11 @@ JWT_TOKEN = _join(
     "Signature_abc123",
 )
 AWS_ACCESS_KEY = _join("AK", "IAIOSFODNN7EXAMPLE")
+LONG_SQL = (
+    "SELECT "
+    + ", ".join(f"column_{i}" for i in range(260))
+    + " FROM app.users WHERE token = 'secret-value' AND role = 'admin';"
+)
 
 
 # ---- Test cases ---- (label, input, must_have, must_not_have)
@@ -106,10 +112,22 @@ cases = [
         ["[SQL query]"],
         ["SELECT", "app.users"],
     ),
-
-    # --- SQL without semicolon: schema ref still caught individually ---
     (
-        "SQL no semi: schema ref still caught",
+        "SQL: very long query",
+        LONG_SQL,
+        ["[SQL query]"],
+        ["SELECT", "column_200", "app.users", "secret-value"],
+    ),
+
+    # --- SQL without semicolon: still redact through end-of-text ---
+    (
+        "SQL no semi: statement redacted",
+        "SELECT password, token FROM app.messages WHERE role = 'admin'",
+        ["[SQL query]"],
+        ["SELECT", "password", "token", "app.messages", "admin"],
+    ),
+    (
+        "Schema ref without SQL keyword still caught",
         "I will query app.messages to find the answer",
         ["[table]"],
         ["app.messages"],
@@ -167,6 +185,12 @@ cases = [
         f"API key is {OPENAI_STYLE_TOKEN}",
         ["[token]"],
         [_join("sk", "-")],
+    ),
+    (
+        "Token sk-proj hyphenated",
+        f"Project API key is {OPENAI_PROJECT_TOKEN}",
+        ["[token]"],
+        [_join("sk", "-proj-"), "SECRETTAIL"],
     ),
     (
         "Token npm_",
@@ -478,6 +502,13 @@ streaming_cases = [
         ["[token]"],
     ),
     (
+        "Stream: sk-proj token split",
+        f"Key is {OPENAI_PROJECT_TOKEN}{_PAD}",
+        [14, 30, 300],
+        [_join("sk", "-proj-"), "SECRETTAIL"],
+        ["[token]"],
+    ),
+    (
         "Stream: Azure SAS sig split",
         f"Blob auth {AZURE_SAS_SIG}{_PAD}",
         [18, 20, 300],
@@ -510,6 +541,20 @@ streaming_cases = [
         f"Prefix text. SELECT id, name FROM app.users WHERE role = 'admin' AND active = TRUE ORDER BY name;{_PAD}",
         [20, 20, 20, 20, 20, 300],  # SQL split across many chunks
         ["SELECT", "app.users", "admin", "ORDER BY"],
+        ["[SQL query]"],
+    ),
+    (
+        "Stream: very long SQL over previous regex bound",
+        f"Prefix text. {LONG_SQL}{_PAD}",
+        [80, 120, 120, 120, 120, 120, 120, 120, 5000],
+        ["SELECT", "column_200", "app.users", "secret-value"],
+        ["[SQL query]"],
+    ),
+    (
+        "Stream: unterminated SQL final flush",
+        "Thinking. SELECT password, token FROM app.users WHERE role = 'admin'",
+        [20, 20, 20, 20],
+        ["SELECT", "password", "token", "app.users", "admin"],
         ["[SQL query]"],
     ),
     (
