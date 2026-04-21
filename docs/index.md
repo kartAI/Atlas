@@ -129,7 +129,7 @@ Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
 <style>
   body.dark { background: #0d1117; color: #c9d1d9; }
   body.dark hr { border-color: #30363d; }
-  body.dark #theme-toggle { color: #fff}
+  body.dark .main-content h3 { color: #c9d1d9; }
 
   #theme-toggle {
     position: fixed;
@@ -137,7 +137,7 @@ Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
     right: 1.5rem;
     z-index: 999;
     background: #238636;
-    color: #1a1a1a;
+    color: #fff;
     border: none;
     border-radius: 2rem;
     padding: 0.5rem 1rem;
@@ -153,7 +153,7 @@ Atlas støtter mørk og lys modus med persistent lagring i nettleseren.
   const apply = dark => {
     document.body.classList.toggle('dark', dark);
     document.getElementById('theme-icon').className = dark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-    document.getElementbyId('Atlas-logo').src = dark ? 'assets/norkartFull_white.png' : 'assets/norkartFull.png';
+    document.getElementById('atlas-logo').src = dark ? 'assets/norkartFull_white.png' : 'assets/norkartFull.png';
   };
   apply(localStorage.getItem('theme') === 'dark');
   btn.addEventListener('click', () => {
