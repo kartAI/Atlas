@@ -6,6 +6,7 @@ Tools:
   - search_documents_fuzzy:   Fuzzy search (pg_trgm trigram similarity).
   - search_documents_semantic: Semantic search (pgvector cosine similarity).
   - search_hybrid:            Combined full-text + semantic + fuzzy search.
+  - get_search_result_chunk:  Fetch the full chunk text behind a semantic result.
   - index_document:           Index a single PDF from Azure Blob Storage (via pipeline).
   - index_all_documents:      Index all PDFs from Azure Blob Storage (via pipeline).
   - get_indexing_status:       Show indexing status counts per category.
@@ -16,7 +17,13 @@ import logging
 import os
 
 from fastmcp import FastMCP
-from search_service import search_full_text, search_fuzzy, search_semantic, hybrid_search
+from search_service import (
+    get_chunk_by_id,
+    hybrid_search,
+    search_full_text,
+    search_fuzzy,
+    search_semantic,
+)
 from ingest_pipeline import process_document, run_pipeline, discover_documents, update_index_status
 from db import query as db_query
 
@@ -83,6 +90,8 @@ async def search_documents_semantic(query: str, limit: int = 10) -> str:
     Semantisk søk i dokumenter via pgvector (cosine similarity).
     Bruker embedding-modellen til å finne dokumenter med lignende innhold,
     selv om ordene ikke matcher direkte. Krever at GITHUB_MODELS_TOKEN er satt.
+    Treff fra chunks inkluderer chunk_id; bruk get_search_result_chunk for å
+    hente fulltekst bak et slikt treff.
 
     Args:
         query: Søkeord eller frase, f.eks. 'miljøpåvirkning av veier'.
@@ -124,6 +133,27 @@ async def search_hybrid(query: str, limit: int = 10) -> str:
     except Exception as e:
         logger.exception("search_hybrid failed")
         return json.dumps({"error": f"Hybrid-søk feilet: {e}"})
+
+
+@mcp.tool(annotations={"readOnlyHint": True})
+async def get_search_result_chunk(chunk_id: int) -> str:
+    """
+    Hent fulltekst og metadata for en chunk fra et semantisk eller hybridt søketreff.
+
+    Args:
+        chunk_id: chunk_id fra search_documents_semantic eller search_hybrid.
+    """
+    if chunk_id <= 0:
+        return json.dumps({"error": "chunk_id må være et positivt heltall."}, ensure_ascii=False)
+
+    try:
+        chunk = await get_chunk_by_id(chunk_id)
+        if chunk is None:
+            return json.dumps({"error": f"Fant ikke chunk {chunk_id}."}, ensure_ascii=False)
+        return json.dumps({"chunk": chunk}, ensure_ascii=False, default=str)
+    except Exception as e:
+        logger.exception("get_search_result_chunk failed")
+        return json.dumps({"error": f"Henting av chunk feilet: {e}"}, ensure_ascii=False)
 
 
 @mcp.tool(annotations={"readOnlyHint": False})
@@ -184,7 +214,7 @@ async def index_all_documents(force: bool = False) -> str:
 async def get_indexing_status() -> str:
     """
     Vis statusoversikt for dokumentindeksering fra Azure Blob Storage.
-    Returnerer antall PDF-filer per status: new, processing, ready, failed.
+    Returnerer antall PDF-filer per status: new, processing, ready, partial, failed.
     Teller bare dokumenter med source_blob (ekte PDF-er fra Blob Storage).
     """
     try:

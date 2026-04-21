@@ -1,6 +1,8 @@
 """
 Structure-aware chunking for Norwegian KU (consequence assessment) documents.
 
+
+
 Chunking strategy (two-level)
 ------------------------------
 1. Detect section boundaries via heading detection (font size + bold + numbered
@@ -22,6 +24,7 @@ MIN_SECTION_CHARS            Sections shorter than this are kept as-is (no split
 MIN_HEADINGS_FOR_STRUCTURE   Min headings required before falling back to paragraph mode.
 """
 
+from collections import Counter
 import logging
 import re
 from typing import Optional
@@ -56,7 +59,10 @@ _NUMBERED_SECTION_RE = re.compile(
 # (-et, -en) so "nullalternativet" must also match. The leading \b prevents
 # false positives on unrelated words.
 _ALTERNATIVE_RE = re.compile(
-    r'\b(nullalternativ|alternativ\s*\d+[a-z]?|alternativ\s*[a-z])',
+    r'\b('
+    r'nullalternativ(?:et|en)?'
+    r'|alternativ\s*(?:\d+[a-z]?|[a-z])(?![a-zæøå0-9])'
+    r')',
     re.IGNORECASE | re.UNICODE,
 )
 
@@ -84,6 +90,9 @@ _KU_SECTION_KEYWORDS: set[str] = {
     "usikkerhet", "kunnskapsmangler",
     "referanser", "litteratur", "kilder", "vedlegg",
 }
+_KU_KEYWORD_MAX_SUFFIX_CHARS = 25
+_KU_KEYWORD_MAX_WORDS = 6
+_KU_KEYWORD_PREFIX_CONNECTORS = {"av", "for", "og", "om", "-", "–", ":", "("}
 
 # ---------------------------------------------------------------------------
 # Topic classification rules (first match wins)
@@ -120,7 +129,7 @@ def chunk_document(
     """
     Main entry point.
 
-    Takes a list of text blocks (from config.fetch_document_blocks) and returns
+    Takes a list of text blocks (from pdf_extractor.fetch_document_blocks) and returns
     a list of chunk dicts ready for storage and embedding.
 
     Returned chunk dict fields:
@@ -169,7 +178,6 @@ def _detect_body_font_size(blocks: list[dict]) -> float:
     Used as the baseline for relative heading detection.
     Falls back to 11.0 pt if no font size data is available.
     """
-    from collections import Counter
     sizes = [
         round(block.get("font_size", 0))
         for block in blocks
@@ -197,13 +205,29 @@ def _parse_numbered_heading(text: str) -> Optional[tuple[str, str, int]]:
 
 def _is_known_ku_keyword(text: str) -> bool:
     """Return True if text (lowercased, stripped) matches a known KU section keyword."""
-    lower = text.strip().lower()
+    lower = " ".join(text.strip().lower().split())
+    if not lower:
+        return False
     if lower in _KU_SECTION_KEYWORDS:
         return True
-    # Allow "keyword: ..." or "keyword — ..." prefix forms
+
+    # Prefix matching is intentionally conservative. It is meant to keep
+    # heading-like phrases such as "Sammendrag av konsekvens..." or
+    # "Metode og datagrunnlag", but avoid promoting ordinary body sentences
+    # like "Metode og datagrunnlag er beskrevet nedenfor." to headings.
+    if lower.endswith((".", "!", "?")):
+        return False
+    if len(lower.split()) > _KU_KEYWORD_MAX_WORDS:
+        return False
+
     for keyword in _KU_SECTION_KEYWORDS:
-        if lower.startswith(keyword) and len(lower) < len(keyword) + 40:
-            return True
+        if lower.startswith(keyword) and len(lower) <= len(keyword) + _KU_KEYWORD_MAX_SUFFIX_CHARS:
+            suffix = lower[len(keyword):].strip()
+            if not suffix:
+                return True
+            first_token = suffix.split(maxsplit=1)[0]
+            if first_token in _KU_KEYWORD_PREFIX_CONNECTORS:
+                return True
     return False
 
 
@@ -505,33 +529,37 @@ def _group_paragraphs_into_children(
     if not paragraphs:
         return []
 
+    _SEP = "\n\n"
+    _SEP_LEN = len(_SEP)
+
     groups: list[str] = []
     current_parts: list[str] = []
     current_len   = 0
     overlap_prefix = ""  # appended to the start of the next group
 
     for para in paragraphs:
-        para_len = len(para)
+        # Account for the separator that will be inserted between paragraphs
+        added_len = len(para) + (_SEP_LEN if current_parts else 0)
 
-        if current_len + para_len > target_size and current_parts:
+        if current_len + added_len > target_size and current_parts:
             # Flush current group
-            joined = "\n\n".join(current_parts)
-            group_text = (overlap_prefix + "\n\n" + joined) if overlap_prefix else joined
+            joined = _SEP.join(current_parts)
+            group_text = (overlap_prefix + _SEP + joined) if overlap_prefix else joined
             groups.append(group_text.strip())
 
             # Compute overlap for the next group
             overlap_prefix = joined[-overlap_chars:] if len(joined) > overlap_chars else joined
 
             current_parts = [para]
-            current_len   = para_len
+            current_len   = len(para)
         else:
             current_parts.append(para)
-            current_len += para_len
+            current_len += added_len
 
     # Flush final group
     if current_parts:
-        joined = "\n\n".join(current_parts)
-        group_text = (overlap_prefix + "\n\n" + joined) if (overlap_prefix and groups) else joined
+        joined = _SEP.join(current_parts)
+        group_text = (overlap_prefix + _SEP + joined) if (overlap_prefix and groups) else joined
         groups.append(group_text.strip())
 
     return [group for group in groups if group.strip()]
@@ -649,13 +677,19 @@ def _structure_based_chunks(
             chunk_index += 1
 
             # Child chunks: cover the full section body
+            # Prepend heading context so each child's embedding captures which
+            # section it belongs to (same pattern as parent chunk).
             for group_text in child_groups:
+                child_text = (
+                    f"{heading_prefix}\n\n{group_text}".strip()
+                    if heading_prefix else group_text
+                )
                 chunks.append({
                     "local_id":        local_id,
                     "local_parent_id": parent_local_id,
                     "chunk_index":     chunk_index,
-                    "text":            group_text,
-                    "char_count":      len(group_text),
+                    "text":            child_text,
+                    "char_count":      len(child_text),
                     "metadata":        dict(base_meta),
                 })
                 local_id    += 1
