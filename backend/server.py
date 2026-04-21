@@ -29,6 +29,7 @@ AI orchestration:
   GET  /api/search    — Quick test endpoint for document search
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -44,10 +45,15 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
 from starlette.routing import Mount, Route
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 
 from config import ALLOWED_ORIGINS, DEMO_MODE, HOST, PORT, list_documents
 from copilot import CopilotClient
+from sanitizer import (
+    sanitize_completed_thinking as _sanitize_completed_thinking,
+    sanitize_thinking as _sanitize_thinking,
+    find_pending_sql_start as _find_pending_sql,
+)
 from session_manager import SessionManager
 from usage_tracker import get_or_create_tracker, get_tracker
 from db import init_db_pool, close_pool, execute, execute_transaction, query
@@ -113,7 +119,7 @@ async def chat(request: Request):
     """
     POST /api/chat
 
-    Body: { message, chat_id?, map_context? }
+    Body: { message, chat_id?, map_context?, stream? }
     Header: Authorization: Bearer <token>
 
     - Validates the session token and resolves the owning user.
@@ -121,7 +127,7 @@ async def chat(request: Request):
     - Ownership of chat_id is enforced before use.
     - Loads prior DB messages for context injection into the Copilot session.
     - Persists the user message and AI reply to app.messages.
-    - Returns { reply, chat_id, map_actions }.
+    - If stream=true, returns SSE events; otherwise returns JSON { reply, chat_id, map_actions }.
     """
     user = await get_user_from_request(request)
     if not user:
@@ -135,8 +141,11 @@ async def chat(request: Request):
     message = (data.get("message") or "").strip()
     if not message:
         return JSONResponse({"error": "'message' is required."}, status_code=400)
+    if len(message) > 10000:
+        return JSONResponse({"error": "Message too long."}, status_code=400)
     map_context = data.get("map_context")
     tool_hints = normalize_tool_hints(data.get("tool_hints"))
+    stream = data.get("stream") is True
 
     chat_id: str | None = data.get("chat_id")
     created_chat = not chat_id
@@ -189,7 +198,19 @@ async def chat(request: Request):
     turn_id = f"{chat_id}-{len(prior_messages) // 2}"
     tracker.start_turn(turn_id)
 
-    # Send to Copilot
+    if stream:
+        return StreamingResponse(
+            _stream_chat(copilot_session, message, map_context, chat_id, user_id, created_chat, tool_hints, tracker),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    # Non-streaming fallback (original behaviour)
     try:
         result = await manager.send_message(copilot_session, message, map_context=map_context, chat_id=chat_id, tool_hints=tool_hints)
     except Exception as exc:
@@ -210,14 +231,15 @@ async def chat(request: Request):
     usage_snapshot = tracker.snapshot(turn_usage)
 
     # Persist the full exchange + AI layers atomically.
+    user_meta = json.dumps({"tool_hints": tool_hints}) if tool_hints else None
     tx_statements = [
         (
-            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-            (chat_id, "user", message),
+            "INSERT INTO app.messages (chat_id, role, content, metadata) VALUES (%s, %s, %s, %s::jsonb)",
+            (chat_id, "user", message, user_meta),
         ),
         (
-            "INSERT INTO app.messages (chat_id, role, content) VALUES (%s, %s, %s)",
-            (chat_id, "assistant", reply),
+            "INSERT INTO app.messages (chat_id, role, content, metadata) VALUES (%s, %s, %s, %s::jsonb)",
+            (chat_id, "assistant", reply, None),
         ),
         (
             "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
@@ -272,6 +294,179 @@ async def chat(request: Request):
         "map_actions": map_actions,
         "usage": usage_snapshot,
     })
+
+
+async def _stream_chat(copilot_session, message, map_context, chat_id, user_id, created_chat, tool_hints, tracker):
+    """
+    Async generator that yields SSE events for a streaming chat response.
+
+    Event types:
+      event: meta       — { chat_id }
+      event: thinking   — { content: "delta..." }
+      event: delta      — { content: "delta..." }
+      event: done       — { content, map_actions, usage }
+      event: error      — { error: "..." }
+    """
+
+    # Immediately tell the client which chat_id to use
+    yield f"event: meta\ndata: {json.dumps({'chat_id': chat_id})}\n\n"
+
+    # Holdback buffer size — chars withheld from the client until the next
+    # chunk (or final flush) so that patterns split across chunk boundaries
+    # are never partially emitted before the sanitizer can recognise them.
+    _THINKING_HOLDBACK = 128
+    _MAX_THINKING_CHARS = 100_000
+    _THINKING_TRUNCATED_MARKER = "[thinking truncated]"
+
+    reply = ""
+    raw_thinking = ""       # unsanitized accumulation for full-text re-sanitization
+    chars_sent = 0          # sanitized chars already emitted to client
+    map_actions = []
+    thinking_truncated = False
+
+    def _finalize_thinking_text(raw_text: str, *, truncated: bool) -> str:
+        text = _sanitize_completed_thinking(raw_text)
+        if not truncated:
+            return text
+        safe_end = max(0, len(text) - _THINKING_HOLDBACK)
+        text = text[:safe_end]
+        if text:
+            return f"{text}\n{_THINKING_TRUNCATED_MARKER}"
+        return _THINKING_TRUNCATED_MARKER
+
+    try:
+        async for chunk in manager.send_message_stream(
+            copilot_session, message,
+            map_context=map_context, chat_id=chat_id, tool_hints=tool_hints,
+        ):
+            ctype = chunk["type"]
+            if ctype == "thinking":
+                if thinking_truncated:
+                    continue
+                raw_thinking += chunk["content"]
+                if len(raw_thinking) > _MAX_THINKING_CHARS:
+                    # Safety cutoff to prevent memory issues from runaway thinking text.
+                    raw_thinking = raw_thinking[:_MAX_THINKING_CHARS]
+                    thinking_truncated = True
+                # Re-sanitize the full accumulated text so patterns that span
+                # chunk boundaries are caught.
+                full_sanitized = _sanitize_thinking(raw_thinking)
+
+                # Safe emission boundary: hold back _THINKING_HOLDBACK chars
+                # for short patterns, and everything from an unterminated SQL
+                # keyword onward.  We search the *sanitized* text so offsets
+                # stay valid after earlier rules shorten it.
+                safe_end = max(chars_sent, len(full_sanitized) - _THINKING_HOLDBACK)
+                pending_sql = _find_pending_sql(full_sanitized)
+                if pending_sql >= 0:
+                    # Suppress all output from the SQL keyword onward.
+                    safe_end = min(safe_end, pending_sql)
+                    safe_end = max(safe_end, chars_sent)  # never go backwards
+
+                if safe_end > chars_sent:
+                    delta = full_sanitized[chars_sent:safe_end]
+                    yield f"event: thinking\ndata: {json.dumps({'content': delta})}\n\n"
+                    chars_sent = safe_end
+            elif ctype == "delta":
+                yield f"event: delta\ndata: {json.dumps({'content': chunk['content']})}\n\n"
+            elif ctype == "done":
+                reply = chunk["content"]
+                map_actions = chunk["map_actions"]
+
+    except asyncio.CancelledError:
+        # Client disconnected — clean up silently.
+        tracker.finalise_turn()
+        logger.info("Stream cancelled (client disconnect) for chat %s", chat_id)
+        return
+
+    except Exception as exc:
+        tracker.finalise_turn()
+        logger.error("Streaming failed for chat %s: %s", chat_id, exc)
+        yield f"event: error\ndata: {json.dumps({'error': 'AI service error. Please try again.'})}\n\n"
+        return
+
+    # Flush any held-back thinking text now that no more chunks can arrive.
+    if raw_thinking:
+        full_sanitized = _finalize_thinking_text(raw_thinking, truncated=thinking_truncated)
+        if len(full_sanitized) > chars_sent:
+            remaining = full_sanitized[chars_sent:]
+            yield f"event: thinking\ndata: {json.dumps({'content': remaining})}\n\n"
+
+    # Assign stable layer_ids to AI-generated layers (mirrors non-streaming path).
+    for action in map_actions:
+        action["layer_id"] = f"drawn-{int(time.time() * 1000)}-{secrets.token_hex(3)}"
+
+    turn_usage = tracker.finalise_turn()
+    usage_snapshot = tracker.snapshot(turn_usage)
+
+    # Re-sanitize the full thinking text for persistent storage — ensures
+    # patterns split across streaming chunks are properly redacted at rest.
+    thinking_text = (
+        _finalize_thinking_text(raw_thinking, truncated=thinking_truncated)
+        if raw_thinking else ""
+    )
+
+    # Persist the full exchange + AI layers atomically.
+    user_meta = json.dumps({"tool_hints": tool_hints}) if tool_hints else None
+    asst_meta = json.dumps({"thinking": thinking_text}) if thinking_text else None
+    tx_statements = [
+        (
+            "INSERT INTO app.messages (chat_id, role, content, metadata) VALUES (%s, %s, %s, %s::jsonb)",
+            (chat_id, "user", message, user_meta),
+        ),
+        (
+            "INSERT INTO app.messages (chat_id, role, content, metadata) VALUES (%s, %s, %s, %s::jsonb)",
+            (chat_id, "assistant", reply, asst_meta),
+        ),
+        (
+            "UPDATE app.chats SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (chat_id,),
+        ),
+    ]
+
+    for action in map_actions:
+        geojson = action.get("geojson")
+        if not geojson or not isinstance(geojson, dict):
+            continue
+        shape = geojson.get("type", "Feature")
+        if shape == "FeatureCollection":
+            pass  # keep as-is
+        elif geojson.get("geometry"):
+            shape = geojson["geometry"].get("type", "Feature")
+        tx_statements.append((
+            """
+            INSERT INTO app.chat_layers (chat_id, layer_id, name, shape, visible, geojson)
+            VALUES (%s, %s, %s, %s, TRUE, %s::jsonb)
+            ON CONFLICT (chat_id, layer_id)
+            DO UPDATE SET name = EXCLUDED.name, shape = EXCLUDED.shape,
+                          geojson = EXCLUDED.geojson, updated_at = now()
+            """,
+            (
+                chat_id,
+                action["layer_id"],
+                action.get("layer_name", "AI-lag"),
+                shape,
+                json.dumps(geojson),
+            ),
+        ))
+
+    try:
+        await execute_transaction(tx_statements)
+    except Exception as exc:
+        logger.error("Failed to persist messages for chat %s: %s", chat_id, exc)
+        await manager.discard_chat(chat_id)
+        if created_chat:
+            try:
+                await execute(
+                    "DELETE FROM app.chats WHERE id = %s AND user_id = %s",
+                    (chat_id, user_id),
+                )
+            except Exception:
+                logger.warning("Failed to clean up unsaved chat %s", chat_id, exc_info=True)
+        yield f"event: error\ndata: {json.dumps({'error': 'Could not save chat history.'})}\n\n"
+        return
+
+    yield f"event: done\ndata: {json.dumps({'content': reply, 'map_actions': map_actions, 'usage': usage_snapshot})}\n\n"
 
 
 # ---------------------------------------------------------------------------

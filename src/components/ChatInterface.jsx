@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
-import { ArrowUp, Paperclip, FileText, X, Plus, Wrench } from 'lucide-react';
+import { ArrowUp, Paperclip, FileText, X, Plus, Wrench, ChevronDown, ChevronRight, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { AuthModal } from './AuthModal';
 import { ChatHistory } from './ChatHistory';
 import { TurnUsage, MonthlyUsageBar, InputAreaUsageBar } from './UsageDisplay';
+import toolCatalog from '../../shared/tool_catalog.json';
 import {
   apiFetch,
   clearActiveChatId,
@@ -14,6 +15,55 @@ import {
   getToken,
   setActiveChatId,
 } from '../utils/auth';
+
+const _TOOL_BY_MCP_ID = Object.fromEntries(
+  toolCatalog.tools.map(t => [t.mcpTool, t])
+);
+
+function ThinkingBlock({ thinking, isStreaming }) {
+  const [expanded, setExpanded] = useState(isStreaming);
+  const contentRef = useRef(null);
+  const userScrolledUp = useRef(false);
+
+  // Detect if user has manually scrolled up (stop auto-scroll if so)
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    function onScroll() {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+      userScrolledUp.current = !atBottom;
+    }
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [expanded]); // re-attach when expanded toggles (el mounts/unmounts)
+
+  // Auto-scroll to bottom as thinking text streams in, unless user scrolled up.
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (expanded && el && !userScrolledUp.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [thinking, expanded]);
+
+  if (!thinking) return null;
+
+  return (
+    <div className={`thinking-block${isStreaming ? ' thinking-block--streaming' : ''}`}>
+      <button className="thinking-toggle" onClick={() => setExpanded(e => !e)}>
+        <Brain size={14} className="thinking-icon" />
+        <span className="thinking-label">
+          {isStreaming ? 'Tenker…' : 'Tankeprosess'}
+        </span>
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </button>
+      {expanded && (
+        <div className="thinking-content" ref={contentRef}>
+          {thinking}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], onLayerCreated, onSetDrawnLayers, selectedTools = [], onClearSelectedTools, onRemoveTool }) {
   // Auth state
@@ -35,7 +85,9 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   const [attachments, setAttachments] = useState([]);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
+  const streamAbortRef = useRef(null);
   const textareaRef = useRef(null);
+  const assistantIdx = useRef(null);
 
   const MAX_TEXTAREA_HEIGHT = 250; // ~5 rows
 
@@ -62,6 +114,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   // External logout signal (e.g. header logout button)
   useEffect(() => {
     if (externalUser === null && user !== null) {
+      streamAbortRef.current?.abort();
       setUser(null);
       setActiveChatIdState(null);
       setMessages([]);
@@ -76,6 +129,11 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalUser]);
+
+  // Abort any in-flight streaming fetch when the component unmounts.
+  useEffect(() => {
+    return () => { streamAbortRef.current?.abort(); };
+  }, []);
 
   // On mount: verify token, restore last active chat
   useEffect(() => {
@@ -147,11 +205,24 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
       const res = await apiFetch(`/api/chats/${chatId}/messages`);
       if (!res.ok) return false;
       const data = await res.json();
-      const loaded = (data.messages || []).map(m => ({
-        role: m.role,
-        text: m.content || '',
-        attachments: [],
-      }));
+      const loaded = (data.messages || []).map(m => {
+        const metadata = m.metadata || {};
+        const msg = {
+          role: m.role,
+          text: m.content || '',
+          attachments: [],
+        };
+        if (m.role === 'assistant' && metadata.thinking) {
+          msg.thinking = metadata.thinking;
+        }
+        if (metadata.tool_hints?.length) {
+          msg.tools = metadata.tool_hints.map(mcpId => {
+            const entry = _TOOL_BY_MCP_ID[mcpId];
+            return { name: entry?.name || mcpId, mcpTool: mcpId };
+          });
+        }
+        return msg;
+      });
       setMessages(loaded);
       return true;
     } catch {
@@ -190,6 +261,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   }
 
   async function handleNewChat() {
+    streamAbortRef.current?.abort();
     setActiveChatIdState(null);
     setActiveChatId(null);
     setMessages([]);
@@ -202,6 +274,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
   }
 
   async function handleContinueChat(chatId) {
+    streamAbortRef.current?.abort();
     const loaded = await loadChatMessages(chatId);
     if (!loaded) return;
     setActiveChatIdState(chatId);
@@ -257,6 +330,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     if (!trimmed && attachments.length === 0) return;
     if (isLoading) return;
 
+    const wasNewChat = !activeChatId;
     const sentTools = [...selectedTools];
     const userMessage = { role: 'user', text: trimmed, attachments: [...attachments], tools: sentTools };
     setMessages(prev => [...prev, userMessage]);
@@ -265,7 +339,15 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     onClearSelectedTools?.();
     setIsLoading(true);
 
+    // Add a placeholder assistant message that we'll update incrementally
+    setMessages(prev => {
+      assistantIdx.current = prev.length;
+      return [...prev, { role: 'assistant', text: '', thinking: '', streamDone: false, attachments: [] }];
+    });
+
     try {
+      const abortController = new AbortController();
+      streamAbortRef.current = abortController;
       const res = await apiFetch('/api/chat', {
         method: 'POST',
         body: JSON.stringify({
@@ -273,79 +355,167 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
           chat_id: activeChatId || undefined,
           map_context: drawnLayers,
           tool_hints: sentTools.map(t => t.mcpTool),
+          stream: true,
         }),
+        signal: abortController.signal,
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setMessages(prev => [
-          ...prev,
-          { role: 'assistant', text: data.error || 'En feil oppstod.', attachments: [] },
-        ]);
+        const data = await res.json();
+        setMessages(prev => {
+          const copy = [...prev];
+          copy[assistantIdx.current] = { role: 'assistant', text: data.error || 'En feil oppstod.', attachments: [] };
+          return copy;
+        });
         return;
       }
 
-      if (data.map_actions?.length && onLayerCreated) {
-        data.map_actions.forEach(action => {
-          const geojson = action.geojson;
-          const shape = geojson?.type === 'FeatureCollection'
-            ? 'FeatureCollection'
-            : (geojson?.geometry?.type || 'Feature');
-          onLayerCreated({
-            id: action.layer_id || `drawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: action.layer_name,
-            shape,
-            geoJson: geojson,
-            visible: true,
-          }, { persisted: true });
-        });
-      }
+      // Parse SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let eventType = null;
 
-      if (!activeChatId && data.chat_id) {
-        setActiveChatIdState(data.chat_id);
-        setActiveChatId(data.chat_id);
-        setChatsLoaded(false); // Invalidate so history refreshes next open.
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        // Bulk-persist any pre-existing drawn layers to the newly created chat.
-        const persistable = drawnLayers.filter(l => l.id && l.geoJson);
-        if (persistable.length > 0) {
-          apiFetch(`/api/chats/${data.chat_id}/layers/bulk`, {
-            method: 'POST',
-            body: JSON.stringify({
-              layers: persistable.map(l => ({
-                layer_id: l.id,
-                name: l.name || 'Untitled layer',
-                shape: l.shape || 'Feature',
-                visible: l.visible !== false,
-                geojson: l.geoJson,
-              })),
-            }),
-          }).catch(() => { /* fire-and-forget */ });
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ') && eventType) {
+            let payload;
+            try {
+              payload = JSON.parse(line.slice(6));
+            } catch {
+              eventType = null;
+              continue;
+            }
+
+            if (eventType === 'meta' && payload.chat_id) {
+              if (!activeChatId) {
+                setActiveChatIdState(payload.chat_id);
+                setActiveChatId(payload.chat_id);
+                setChatsLoaded(false);
+
+                // Bulk-persist any pre-existing drawn layers to the newly created chat.
+                const persistable = drawnLayers.filter(l => l.id && l.geoJson);
+                if (persistable.length > 0) {
+                  apiFetch(`/api/chats/${payload.chat_id}/layers/bulk`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      layers: persistable.map(l => ({
+                        layer_id: l.id,
+                        name: l.name || 'Untitled layer',
+                        shape: l.shape || 'Feature',
+                        visible: l.visible !== false,
+                        geojson: l.geoJson,
+                      })),
+                    }),
+                  }).catch(() => { /* fire-and-forget */ });
+                }
+              }
+            } else if (eventType === 'thinking') {
+              setMessages(prev => {
+                const idx = assistantIdx.current;
+                if (idx === null || idx >= prev.length) return prev;
+                const copy = [...prev];
+                const msg = { ...copy[idx] };
+                msg.thinking = (msg.thinking || '') + payload.content;
+                copy[idx] = msg;
+                return copy;
+              });
+            } else if (eventType === 'delta') {
+              setMessages(prev => {
+                const idx = assistantIdx.current;
+                if (idx === null || idx >= prev.length) return prev;
+                const copy = [...prev];
+                const msg = { ...copy[idx] };
+                msg.text = (msg.text || '') + payload.content;
+                copy[idx] = msg;
+                return copy;
+              });
+            } else if (eventType === 'done') {
+              // Process map actions
+              if (payload.map_actions?.length && onLayerCreated) {
+                payload.map_actions.forEach(action => {
+                  const geojson = action.geojson;
+                  const shape = geojson?.type === 'FeatureCollection'
+                    ? 'FeatureCollection'
+                    : (geojson?.geometry?.type || 'Feature');
+                  onLayerCreated({
+                    id: action.layer_id || `drawn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    name: action.layer_name,
+                    shape,
+                    geoJson: geojson,
+                    visible: true,
+                  }, { persisted: !!action.layer_id });
+                });
+              }
+
+              if (payload.usage) {
+                setUsageSession(payload.usage.session || null);
+                setUsageMonthly(payload.usage.monthly || null);
+              }
+
+              // Finalize the assistant message with complete content and usage
+              setMessages(prev => {
+                const idx = assistantIdx.current;
+                if (idx === null || idx >= prev.length) return prev;
+                const copy = [...prev];
+                const msg = { ...copy[idx] };
+                msg.text = payload.content || msg.text;
+                msg.turnUsage = payload.usage?.turn || null;
+                msg.streamDone = true;
+                copy[idx] = msg;
+                return copy;
+              });
+            } else if (eventType === 'error') {
+              setMessages(prev => {
+                const idx = assistantIdx.current;
+                if (idx === null || idx >= prev.length) return prev;
+                const copy = [...prev];
+                copy[idx] = {
+                  role: 'assistant',
+                  text: payload.error || 'En feil oppstod.',
+                  attachments: [],
+                };
+                return copy;
+              });
+              // If persistence failed for a newly created chat, the server
+              // deleted it — clear the now-dead ID so follow-ups don't 404.
+              if (wasNewChat) {
+                setActiveChatIdState(null);
+                setActiveChatId(null);
+              }
+            }
+            eventType = null;
+          }
         }
       }
-
-      // Update usage state from the response.
-      if (data.usage) {
-        setUsageSession(data.usage.session || null);
-        setUsageMonthly(data.usage.monthly || null);
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // component unmounted — nothing to update
+      setMessages(prev => {
+        const copy = [...prev];
+        if (assistantIdx.current !== null && assistantIdx.current < copy.length) {
+          copy[assistantIdx.current] = {
+            role: 'assistant', text: 'Kunne ikke kontakte serveren.', attachments: [],
+          };
+        }
+        return copy;
+      });
+      // If a new chat was created (meta event received) but the stream then
+      // died, clear the now-dead chat_id so follow-up messages don't 404.
+      if (wasNewChat) {
+        setActiveChatIdState(null);
+        setActiveChatId(null);
       }
-
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          text: data.reply,
-          attachments: [],
-          turnUsage: data.usage?.turn || null,
-        },
-      ]);
-    } catch {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', text: 'Kunne ikke kontakte serveren.', attachments: [] },
-      ]);
     } finally {
+      streamAbortRef.current = null;
       setIsLoading(false);
     }
   }
@@ -478,11 +648,21 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                         )}
                       </div>
                     )}
+                    {msg.role === 'assistant' && msg.thinking && (
+                      <ThinkingBlock thinking={msg.thinking} isStreaming={isLoading && !msg.streamDone && i === messages.length - 1} />
+                    )}
                     {hasText && (
                       <div className={`chat-bubble chat-bubble--${msg.role}`}>
                         {msg.role === 'assistant'
                           ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
                           : msg.text}
+                      </div>
+                    )}
+                    {msg.role === 'assistant' && !hasText && isLoading && i === messages.length - 1 && !msg.thinking && (
+                      <div className="chat-bubble chat-bubble--assistant chat-bubble--typing">
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
                       </div>
                     )}
                     {msg.role === 'assistant' && msg.turnUsage && (
@@ -491,16 +671,6 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                   </div>
                 );
               })
-            )}
-
-            {isLoading && (
-              <div className="message-wrapper message-wrapper--assistant">
-                <div className="chat-bubble chat-bubble--assistant chat-bubble--typing">
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
-                </div>
-              </div>
             )}
 
             <div ref={bottomRef} />
