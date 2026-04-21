@@ -8,6 +8,7 @@ from typing import Callable, cast
 from copilot import CopilotClient
 from copilot.session import PermissionHandler, PermissionRequestResult
 from mcp_servers.map_server import get_and_clear_shapes, store_map_context, clear_map_context
+from copilot.generated.session_events import SessionEventType
 from usage_tracker import get_or_create_tracker, discard_tracker
 from config import (
     DEMO_MODE,
@@ -196,6 +197,8 @@ class SessionManager:
                 "mode": "append",
                 "content": system_content,
             },
+            streaming=True,
+            reasoning_effort="high",
             # MCP servers the orchestrator can invoke.
             mcp_servers={
                 "database": {
@@ -283,6 +286,119 @@ class SessionManager:
 
         Callers are responsible for persisting messages to the database.
         """
+        full_message = self._build_prompt(message, map_context, chat_id, tool_hints)
+
+        # Refresh activity timestamp so cleanup_expired() doesn't reap the
+        # session while a long send_and_wait() is in-flight.
+        if chat_id and chat_id in self.last_active:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
+
+        try:
+            response = await session.send_and_wait(full_message, timeout=900)
+        except Exception:
+            # Evict the broken session so the next request creates a fresh one
+            # instead of retrying against a permanently dead session.
+            self._evict_session(chat_id)
+            raise
+
+        # Refresh again after the (potentially long) call completes.
+        if chat_id and chat_id in self.last_active:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
+
+        content = response.data.content
+        map_actions = get_and_clear_shapes(chat_id)
+        return {"content": content, "map_actions": map_actions}
+
+    async def send_message_stream(self, session, message: str, map_context=None, chat_id: str = "", tool_hints: list[str] | None = None):
+        """
+        Async generator that yields SSE-style dicts as the model streams its
+        response.  Yields three event types:
+
+        - {"type": "thinking", "content": "..."} — reasoning delta chunks
+        - {"type": "delta",    "content": "..."} — assistant message delta chunks
+        - {"type": "done",     "content": "...", "map_actions": [...]} — final result
+
+        Callers are responsible for persisting messages to the database.
+        """
+        full_message = self._build_prompt(message, map_context, chat_id, tool_hints)
+
+        if chat_id and chat_id in self.last_active:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
+
+        # Shared state accessed by the event handler
+        queue: asyncio.Queue = asyncio.Queue()
+        idle_event = asyncio.Event()
+        error_holder: list = []
+        full_content = []
+        final_message = [None]  # SDK's canonical final message (if received)
+
+        def handler(event):
+            if event.type == SessionEventType.ASSISTANT_REASONING_DELTA:
+                delta = getattr(event.data, "delta_content", None) or ""
+                if delta:
+                    queue.put_nowait({"type": "thinking", "content": delta})
+            elif event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
+                delta = getattr(event.data, "delta_content", None) or ""
+                if delta:
+                    full_content.append(delta)
+                    queue.put_nowait({"type": "delta", "content": delta})
+            elif event.type == SessionEventType.ASSISTANT_MESSAGE:
+                # Canonical final message from the SDK — preferred over delta
+                # accumulation since it may differ (corrections, completions).
+                content = getattr(event.data, "content", None) or ""
+                if content:
+                    final_message[0] = content
+            elif event.type == SessionEventType.SESSION_IDLE:
+                idle_event.set()
+            elif event.type == SessionEventType.SESSION_ERROR:
+                error_holder.append(
+                    Exception(f"Session error: {getattr(event.data, 'message', str(event.data))}")
+                )
+                idle_event.set()
+
+        _STREAM_TIMEOUT = 900  # seconds — matches send_and_wait timeout
+
+        unsubscribe = session.on(handler)
+        try:
+            await session.send(full_message)
+
+            # Yield events as they arrive until the session goes idle.
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + _STREAM_TIMEOUT
+            while not idle_event.is_set():
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    raise TimeoutError(f"Streaming timed out after {_STREAM_TIMEOUT}s")
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=min(1.0, remaining))
+                    yield item
+                except asyncio.TimeoutError:
+                    continue
+
+            # Drain any remaining items from the queue
+            while not queue.empty():
+                yield queue.get_nowait()
+
+            if error_holder:
+                raise error_holder[0]
+
+        except (Exception, asyncio.CancelledError):
+            self._evict_session(chat_id)
+            raise
+        finally:
+            unsubscribe()
+
+        if chat_id and chat_id in self.last_active:
+            self.last_active[chat_id] = datetime.now(timezone.utc)
+
+        # Prefer the SDK's canonical final message over delta accumulation,
+        # since it may contain corrections or completions.
+        content = final_message[0] if final_message[0] is not None else "".join(full_content)
+        map_actions = get_and_clear_shapes(chat_id)
+        yield {"type": "done", "content": content, "map_actions": map_actions}
+
+    def _build_prompt(self, message: str, map_context=None, chat_id: str = "", tool_hints: list[str] | None = None) -> str:
+        """Build the full prompt string from user message and context."""
         parts = []
         if chat_id:
             parts.append(f"[SESSION_ID: {chat_id}]")
@@ -314,38 +430,22 @@ class SessionManager:
                 f"{layer_summaries}"
             )
         parts.append(f"[USER MESSAGE]\n{message}")
-        full_message = "\n\n".join(parts)
+        return "\n\n".join(parts)
 
-        # Refresh activity timestamp so cleanup_expired() doesn't reap the
-        # session while a long send_and_wait() is in-flight.
-        if chat_id and chat_id in self.last_active:
-            self.last_active[chat_id] = datetime.now(timezone.utc)
-
-        try:
-            response = await session.send_and_wait(full_message, timeout=900)
-        except Exception:
-            # Evict the broken session so the next request creates a fresh one
-            # instead of retrying against a permanently dead session.
-            if chat_id and chat_id in self.sessions:
-                self.sessions.pop(chat_id, None)
-                self.last_active.pop(chat_id, None)
-                unsub = self._usage_unsubscribers.pop(chat_id, None)
-                if unsub:
-                    unsub()
-                discard_tracker(chat_id)
-                logger.warning(
-                    "Evicted broken session for chat %s; will recreate on next request",
-                    chat_id,
-                )
-            raise
-
-        # Refresh again after the (potentially long) call completes.
-        if chat_id and chat_id in self.last_active:
-            self.last_active[chat_id] = datetime.now(timezone.utc)
-
-        content = response.data.content
-        map_actions = get_and_clear_shapes(chat_id)
-        return {"content": content, "map_actions": map_actions}
+    def _evict_session(self, chat_id: str):
+        """Evict a broken session so the next request creates a fresh one."""
+        if chat_id and chat_id in self.sessions:
+            self.sessions.pop(chat_id, None)
+            self.last_active.pop(chat_id, None)
+            unsub = self._usage_unsubscribers.pop(chat_id, None)
+            if unsub:
+                unsub()
+            discard_tracker(chat_id)
+            get_and_clear_shapes(chat_id)  # discard any pending map shapes
+            logger.warning(
+                "Evicted broken session for chat %s; will recreate on next request",
+                chat_id,
+            )
 
     async def cleanup_expired(self):
         now = datetime.now(timezone.utc)
@@ -366,7 +466,7 @@ class SessionManager:
             if unsub:
                 unsub()
             discard_tracker(chat_id)
-            clear_map_context(chat_id)
+            get_and_clear_shapes(chat_id)  # discard any pending map shapes
             del self.sessions[chat_id]
             del self.last_active[chat_id]
             logger.info("Session expired and removed for chat: %s", chat_id)
