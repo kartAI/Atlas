@@ -25,14 +25,6 @@ function ThinkingBlock({ thinking, isStreaming }) {
   const contentRef = useRef(null);
   const userScrolledUp = useRef(false);
 
-  // Auto-expand while streaming, allow manual toggle after
-  useEffect(() => {
-    if (isStreaming) {
-      setExpanded(true);
-      userScrolledUp.current = false;
-    }
-  }, [isStreaming]);
-
   // Detect if user has manually scrolled up (stop auto-scroll if so)
   useEffect(() => {
     const el = contentRef.current;
@@ -350,7 +342,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
     // Add a placeholder assistant message that we'll update incrementally
     setMessages(prev => {
       assistantIdx.current = prev.length;
-      return [...prev, { role: 'assistant', text: '', thinking: '', thinkingDone: false, attachments: [] }];
+      return [...prev, { role: 'assistant', text: '', thinking: '', streamDone: false, attachments: [] }];
     });
 
     try {
@@ -444,7 +436,6 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                 const copy = [...prev];
                 const msg = { ...copy[idx] };
                 msg.text = (msg.text || '') + payload.content;
-                msg.thinkingDone = true;
                 copy[idx] = msg;
                 return copy;
               });
@@ -479,7 +470,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                 const msg = { ...copy[idx] };
                 msg.text = payload.content || msg.text;
                 msg.turnUsage = payload.usage?.turn || null;
-                msg.thinkingDone = true;
+                msg.streamDone = true;
                 copy[idx] = msg;
                 return copy;
               });
@@ -658,7 +649,7 @@ export function ChatInterface({ externalUser, onUserChange, drawnLayers = [], on
                       </div>
                     )}
                     {msg.role === 'assistant' && msg.thinking && (
-                      <ThinkingBlock thinking={msg.thinking} isStreaming={isLoading && !msg.thinkingDone && i === messages.length - 1} />
+                      <ThinkingBlock thinking={msg.thinking} isStreaming={isLoading && !msg.streamDone && i === messages.length - 1} />
                     )}
                     {hasText && (
                       <div className={`chat-bubble chat-bubble--${msg.role}`}>

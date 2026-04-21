@@ -2,10 +2,31 @@
 Tests for sanitize_thinking() in sanitizer.py.
 Run standalone: python test_sanitizer.py
 """
+
 import sys
 
 from sanitizer import sanitize_thinking as sanitize
 from sanitizer import find_pending_sql_start
+
+
+def _join(*parts: str) -> str:
+    return "".join(parts)
+
+
+GITHUB_TOKEN = _join("gh", "p_", "abcdefghijklmnopqrst1234567890")
+GITHUB_PAT_TOKEN = _join("github", "_pat_", "ABCDEFGHIJ1234567890abcdef")
+OPENAI_STYLE_TOKEN = _join("sk", "-", "abcdefghijklmnopqrstuvwxyz1234")
+NPM_TOKEN = _join("np", "m_", "abcdefghijklmnopqrstuvwxyz1234567890")
+SLACK_BOT_TOKEN = _join("xox", "b-", "123456789012-123456789012-abcdefghijklmnopqrstuvwxyz")
+AZURE_SAS_SIG = _join("si", "g=", "Z3JhbnQtdGhpcy1pcy1hLWxvbmctc2VjcmV0JTJGJTNE")
+JWT_TOKEN = _join(
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
+    ".",
+    "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0",
+    ".",
+    "Signature_abc123",
+)
+AWS_ACCESS_KEY = _join("AK", "IAIOSFODNN7EXAMPLE")
 
 
 # ---- Test cases ---- (label, input, must_have, must_not_have)
@@ -131,21 +152,33 @@ cases = [
     # --- Tokens ---
     (
         "Token ghp_",
-        "Authenticated with ghp_abcdefghijklmnopqrst1234567890",
+        f"Authenticated with {GITHUB_TOKEN}",
         ["[token]"],
-        ["ghp_"],
+        [_join("gh", "p_")],
     ),
     (
         "Token github_pat_",
-        "Token: github_pat_ABCDEFGHIJ1234567890abcdef",
+        f"Token: {GITHUB_PAT_TOKEN}",
         ["[token]"],
-        ["github_pat_"],
+        [_join("github", "_pat_")],
     ),
     (
         "Token sk-",
-        "API key is sk-abcdefghijklmnopqrstuvwxyz1234",
+        f"API key is {OPENAI_STYLE_TOKEN}",
         ["[token]"],
-        ["sk-"],
+        [_join("sk", "-")],
+    ),
+    (
+        "Token npm_",
+        f"Token: {NPM_TOKEN}",
+        ["[token]"],
+        [_join("np", "m_")],
+    ),
+    (
+        "Token Slack bot",
+        f"Slack bot token {SLACK_BOT_TOKEN}",
+        ["[token]"],
+        [_join("xox", "b-"), "123456789012-123456789012"],
     ),
 
     # --- Azure Blob ---
@@ -160,6 +193,18 @@ cases = [
         "https://store.blob.core.windows.net/c/f.pdf?sv=2020&sig=abc123",
         ["[azure-storage-url]"],
         ["store.blob", "sig="],
+    ),
+    (
+        "Standalone Azure SAS sig",
+        f"Use {AZURE_SAS_SIG} when calling the blob API",
+        ["[token]"],
+        [_join("si", "g=", "Z3JhbnQ")],
+    ),
+    (
+        "FP: short sig stays",
+        "The UI state uses sig=abc123 for a harmless local flag.",
+        ["sig=abc123"],
+        [],
     ),
 
     # --- Internal URLs ---
@@ -311,7 +356,7 @@ cases = [
     # --- JWT / Azure tokens ---
     (
         "Token JWT",
-        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.Signature_abc123",
+        f"Bearer {JWT_TOKEN}",
         ["[token]"],
         ["eyJhbGci"],
     ),
@@ -319,9 +364,9 @@ cases = [
     # --- AWS access keys ---
     (
         "Token AKIA",
-        "Using key AKIAIOSFODNN7EXAMPLE for S3 access",
+        f"Using key {AWS_ACCESS_KEY} for S3 access",
         ["[token]"],
-        ["AKIA"],
+        [_join("AK", "IA")],
     ),
 
     # --- File paths: /tmp and /data ---
@@ -362,6 +407,7 @@ for label, inp, must_have, must_not_have in cases:
         print(f"PASS [{label}]")
     else:
         fail += 1
+
 
 # ---- Streaming holdback simulation tests ----
 # These verify that secrets split across chunk boundaries are never
@@ -426,9 +472,16 @@ streaming_cases = [
     ),
     (
         "Stream: token split",
-        f"Key is ghp_abcdefghijklmnopqrstuvwxyz{_PAD}",
+        f"Key is {GITHUB_TOKEN}{_PAD}",
         [12, 25, 300],  # split after "Key is ghp_a"
-        ["ghp_"],
+        [_join("gh", "p_")],
+        ["[token]"],
+    ),
+    (
+        "Stream: Azure SAS sig split",
+        f"Blob auth {AZURE_SAS_SIG}{_PAD}",
+        [18, 20, 300],
+        [_join("si", "g=", "Z3JhbnQ")],
         ["[token]"],
     ),
     (
@@ -470,13 +523,13 @@ streaming_cases = [
         "Stream: redaction before pending SQL (offset mismatch regression)",
         # Token before SQL shrinks from 104→7 chars after redaction; raw
         # offsets would overshoot and leak the SQL keyword in an early delta.
-        "Prefix ghp_" + "a" * 100 + " " + "z" * 200
+        "Prefix " + _join("gh", "p_") + "a" * 100 + " " + "z" * 200
         + " SELECT id, name, email, phone, address, city, country, created"
         + " FROM app.users WHERE status = True AND role = True"
         + " AND created > now() AND name LIKE pct ORDER BY id;"
         + " " + "x" * 200,
         [80, 80, 80, 80, 200, 300],
-        ["SELECT", "ghp_", "app.users"],
+        ["SELECT", _join("gh", "p_"), "app.users"],
         ["[token]", "[SQL query]"],
     ),
 ]

@@ -54,6 +54,11 @@ _RE_AZURE_BLOB = re.compile(
     r"https?://\S+\.blob\.core\.windows\.net\S*",
     re.IGNORECASE,
 )
+# Standalone Azure SAS signatures sometimes appear without the full blob URL.
+_RE_AZURE_SAS_SIG = re.compile(
+    r"(?<![A-Za-z0-9_])sig=[A-Za-z0-9%/+_-]{12,}",
+    re.IGNORECASE,
+)
 _RE_INTERNAL_URL = re.compile(
     r"https?://(?:"
     r"localhost|127\.0\.0\.1|0\.0\.0\.0"
@@ -67,6 +72,8 @@ _RE_INTERNAL_URL = re.compile(
 _RE_MCP_PATH = re.compile(r"/mcp/\w+/mcp\b")
 _RE_TOKEN = re.compile(
     r"\b(?:ghp_|github_pat_|sk-|AKIA)[A-Za-z0-9_]+"
+    r"|\bnpm_[A-Za-z0-9]{20,}\b"
+    r"|\bxox[a-z]-[A-Za-z0-9-]{10,}\b"
     r"|\beyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+",
 )
 # Absolute file system paths — reveals server directory layout.
@@ -83,6 +90,7 @@ _SANITIZE_RULES: list[tuple[re.Pattern, str]] = [
     (_RE_CONN_STRING,   "[connection-string]"),
     (_RE_TOKEN,         "[token]"),
     (_RE_AZURE_BLOB,    "[azure-storage-url]"),
+    (_RE_AZURE_SAS_SIG, "[token]"),
     (_RE_FILE_PATH,     "[file-path]"),
     (_RE_SQL,           "[SQL query]"),
     (_RE_SCHEMA_TABLE,  "[table]"),
